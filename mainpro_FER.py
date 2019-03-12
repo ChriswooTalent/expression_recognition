@@ -39,7 +39,7 @@ validation_acc = []
 test_acc = []
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobileNet_V1', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobileResNet_v1', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--bs', default=64, type=int, help='learning rate')
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
@@ -92,6 +92,8 @@ elif opt.model  == 'Resnet18':
     net = ResNet18()
 elif opt.model == 'mobileNet_V1':
     net = mobilenet(num_classes=7)
+elif opt.model == 'mobileNet_05':
+    net = mobilenet_05(num_classes=7)
 elif opt.model == 'mobileResNet_v1':
     net = mobileResnet(num_classes=7)
 
@@ -199,6 +201,11 @@ def train_warmup(epoch):
     Train_acc = 100.0*float(correct)/float(total)
     training_loss.append(f_loss)
     training_acc.append(Train_acc)
+    # print('Saving..')
+    # state = {
+    #     'net': net.state_dict() if use_cuda else net,
+    # }
+    # torch.save(state, 'train_model.t7')
 
 # Training
 def train(epoch):
@@ -240,6 +247,12 @@ def train(epoch):
     Train_acc = 100.0*float(correct)/float(total)
     training_loss.append(f_loss)
     training_acc.append(Train_acc)
+
+    print('Saving..')
+    state = {
+        'net': net.state_dict() if use_cuda else net,
+    }
+    torch.save(state, 'PublicTest_model.t7')
     # print('Train_acc is:')
     # print(Train_acc)
     #

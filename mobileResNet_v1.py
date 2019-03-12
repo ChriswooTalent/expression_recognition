@@ -12,6 +12,7 @@ Copyright (c) Yang Lu, 2017
 Modified By cleardusk
 """
 import math
+import torch
 import torch.nn as nn
 
 
@@ -73,10 +74,10 @@ class MergeBlock(nn.Module):
     def __init__(self, inplanes, temp_planes, planes, ksize1=3, ksize2=1, stride=1, prelu=False):
         super(MergeBlock, self).__init__()
         inplanes, planes = int(inplanes), int(planes)
-        self.conv_dw = nn.Conv2d(inplanes, temp_planes, kernel_size=ksize1, padding=1, stride=stride, groups=inplanes,
+        self.conv_dw = nn.Conv2d(inplanes, int(temp_planes), kernel_size=ksize1, padding=1, stride=stride, groups=int(temp_planes),
                                  bias=False)
-        self.bn_dw = nn.BatchNorm2d(inplanes)
-        self.conv_sep = nn.Conv2d(temp_planes, planes, kernel_size=ksize2, stride=1, padding=0, bias=False)
+        self.bn_dw = nn.BatchNorm2d(int(temp_planes))
+        self.conv_sep = nn.Conv2d(int(temp_planes), planes, kernel_size=ksize2, stride=1, padding=0, bias=False)
         self.bn_sep = nn.BatchNorm2d(planes)
         if prelu:
             self.relu = nn.PReLU()
@@ -147,17 +148,21 @@ class MobileResNet(nn.Module):
         self.dw3_2 = block(128 * widen_factor, 256 * widen_factor, stride=2, prelu=prelu)
 
         self.dw4_1 = block(256 * widen_factor, 256 * widen_factor, prelu=prelu)
-        self.merge1 = MergeBlock(512 * widen_factor, 256 * widen_factor, 512 * widen_factor, ksize1=1, ksize2=1,
+        self.merge1 = MergeBlock(256 * widen_factor, 128 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
                                  stride=4, prelu=prelu)
         self.dw4_2 = block(256 * widen_factor, 512 * widen_factor, stride=2, prelu=prelu)
 
         self.dw5_1 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
-        self.merge2 = MergeBlock(512 * widen_factor, 256 * widen_factor, 512 * widen_factor, ksize1=1, ksize2=1,
+        self.merge2 = MergeBlock(512 * widen_factor, 256 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
                                  stride=2, prelu=prelu)
         self.dw5_2 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
         self.dw5_3 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
+        self.merge3 = MergeBlock(512 * widen_factor, 256 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
+                                 stride=2, prelu=prelu)
         self.dw5_4 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
         self.dw5_5 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
+        self.merge4 = MergeBlock(512 * widen_factor, 256 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
+                                 stride=2, prelu=prelu)
         self.dw5_6 = block(512 * widen_factor, 1024 * widen_factor, stride=2, prelu=prelu)
 
         #self.res_1 = ShortCutBlock(128 * widen_factor, 1024 * widen_factor, stride=1)
@@ -165,7 +170,7 @@ class MobileResNet(nn.Module):
         self.dw6 = block(1024 * widen_factor, 1024 * widen_factor, prelu=prelu)
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(int(1024 * widen_factor), num_classes)
+        self.fc = nn.Linear(int(2048 * widen_factor), num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -185,19 +190,22 @@ class MobileResNet(nn.Module):
         x = self.dw3_1(x)
         x = self.dw3_2(x)
         x = self.dw4_1(x)
-        res_input1 = x
+        res_input1 = self.merge1(x)
         x = self.dw4_2(x)
 
         x = self.dw5_1(x)
-        res_input2 = x
+        res_input2 = self.merge2(x)
         x = self.dw5_2(x)
         x = self.dw5_3(x)
+        res_input3 = self.merge3(x)
         x = self.dw5_4(x)
         x = self.dw5_5(x)
+        res_input4 = self.merge4(x)
         x = self.dw5_6(x)
 
         res_output = torch.cat((res_input1, res_input2), 1)
-        x = res_output
+        res_output = torch.cat((res_output, res_input3), 1)
+        res_output = torch.cat((res_output, res_input4), 1)
 
         x = self.dw6(x)
         cat_output = torch.cat((res_output, x), 1)
