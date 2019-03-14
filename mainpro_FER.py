@@ -63,11 +63,11 @@ best_PrivateTest_acc = 0  # best PrivateTest accuracy
 best_PrivateTest_acc_epoch = 0
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
-learning_rate_decay_start = 30  # 50
+learning_rate_decay_start = 20  # 50
 learning_rate_decay_every = 5 # 5
-learning_rate_decay_rate = 0.92 # 0.9
+learning_rate_decay_rate = 0.95 # 0.9
 
-cut_size = 90
+cut_size = 96
 total_epoch = 220
 
 path = os.path.join(opt.dataset + '_' + opt.model)
@@ -82,9 +82,13 @@ transform_train = transforms.Compose([
 ])
 
 transform_test = transforms.Compose([
-    transforms.TenCrop(cut_size),
+    transforms.FiveCrop(cut_size),
     transforms.Lambda(lambda crops: torch.stack([transforms.ToTensor()(crop) for crop in crops])),
 ])
+
+# transform_test = transforms.Compose([
+#      transforms.ToTensor(),
+#  ])
 
 trainset = FER2013(split = 'Training', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_train)
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=opt.bs, shuffle=True)
@@ -157,6 +161,7 @@ def adjust_learning_rate(optimizer, epoch, milestones=None):
     n = to(epoch)
 
     cur_lr = 0
+    decayfactor = 0.98
 
     if n > 1:
         cur_lr = opt.lr * (0.2 ** 1)*(10**(-(n-1)))
@@ -164,15 +169,15 @@ def adjust_learning_rate(optimizer, epoch, milestones=None):
         cur_lr = opt.lr * (0.2 ** n)
 
     if epoch <= opt.warmup:
-        cur_lr = 0.0002
+        cur_lr = 0.000001
     if temp_milestone[0] < epoch <= temp_milestone[1]:
-        cur_lr = 0.001*(0.95 ** (epoch-temp_milestone[0]-1))
+        cur_lr = 0.0001*(decayfactor ** (epoch-temp_milestone[0]-1))
     if temp_milestone[1] < epoch <= temp_milestone[2]:
-        cur_lr = 0.0005*(0.95 ** (epoch-temp_milestone[1]-1))
+        cur_lr = 0.00005*(decayfactor ** (epoch-temp_milestone[1]-1))
     if temp_milestone[2] < epoch <= temp_milestone[3]:
-            cur_lr = 0.0001*(0.95 ** (epoch-temp_milestone[2]-1))
+            cur_lr = 0.00001*(decayfactor ** (epoch-temp_milestone[2]-1))
     if temp_milestone[3] < epoch <= temp_milestone[4]:
-            cur_lr = 0.00001*(0.95 ** (epoch-temp_milestone[3]-1))
+            cur_lr = 0.000001
     for param_group in optimizer.param_groups:
         param_group['lr'] = cur_lr
     return cur_lr
@@ -258,11 +263,11 @@ def train(epoch):
     training_loss.append(f_loss)
     training_acc.append(Train_acc)
 
-    print('Saving..')
-    state = {
-        'net': net.state_dict() if use_cuda else net,
-    }
-    torch.save(state, 'PublicTest_model.t7')
+    # print('Saving..')
+    # state = {
+    #     'net': net.state_dict() if use_cuda else net,
+    # }
+    # torch.save(state, 'PublicTest_model.t7')
     # print('Train_acc is:')
     # print(Train_acc)
     #
@@ -361,8 +366,8 @@ def PrivateTest(epoch):
         best_PrivateTest_acc_epoch = epoch
 
 for epoch in range(start_epoch, total_epoch):
-    #train(epoch)
-    train_warmup(epoch)
+    train(epoch)
+    #train_warmup(epoch)
     PublicTest(epoch)
     PrivateTest(epoch)
     # write_result_to_file(training_loss, 'loss/train_loss.txt')

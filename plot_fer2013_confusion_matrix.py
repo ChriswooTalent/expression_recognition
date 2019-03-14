@@ -35,11 +35,23 @@ opt = parser.parse_args()
 # te_length = 9374
 # re_length = 96
 
-data_file = './data/Fer2013.h5'
-t_length = 28709
-v_length = 3589
-te_length = 3589
+# data_file = './data/data_Augmixed_split.h5'
+# t_length = 99541
+# v_length = 9366
+# te_length = 9369
+# re_length = 100
+
+data_file = './data/data_Augmixed_split_validate.h5'
+t_length = 99541
+v_length = 9366
+te_length = 9369
 re_length = 96
+
+# data_file = './data/Fer2013.h5'
+# t_length = 28709
+# v_length = 3589
+# te_length = 3589
+# re_length = 96
 
 cut_size = 90
 

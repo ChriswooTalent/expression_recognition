@@ -8,41 +8,18 @@ import cv2
 from ImageEnhance import *
 
 dst_resizelength = 96
+datapath = os.path.join('data', 'data_Augmixed_split_validate.h5')
+
 expression_dict = {'Angry': 0, 'Disgust': 1, 'Fear': 2, 'Happy': 3, 'Sad': 4, 'Surprise': 5, 'Neutral': 6}
+
+expression_ind_dict = {0: 'Angry', 1: 'Disgust', 2: 'Fear', 3: 'Happy', 4: 'Sad', 5: 'Surprise', 6: 'Neutral'}
 
 expression_list = {'Angry': [], 'Disgust': [], 'Fear': [], 'Happy': [], 'Sad': [], 'Surprise': [], 'Neutral': []}
 
+expression_count = {'Angry': 0, 'Disgust': 0, 'Fear': 0, 'Happy': 0, 'Sad': 0, 'Surprise': 0, 'Neutral': 0}
+
 subpath = '0'
-animate_image_list = []
 animate_label_list = []
-
-Angry_img_train_list = []
-Angry_img_validate_list = []
-Angry_img_test_list = []
-
-Disgust_img_train_list = []
-Disgust_img_validate_list = []
-Disgust_img_test_list = []
-
-Fear_img_train_list = []
-Fear_img_validate_list = []
-Fear_img_test_list = []
-
-Happy_img_train_list = []
-Happy_img_validate_list = []
-Happy_img_test_list = []
-
-Sad_img_train_list = []
-Sad_img_validate_list = []
-Sad_img_test_list = []
-
-Surprise_img_train_list = []
-Surprise_img_validate_list = []
-Surprise_img_test_list = []
-
-Neutral_img_train_list = []
-Neutral_img_validate_list = []
-Neutral_img_test_list = []
 
 # Creat the list to store the data and label information
 Training_x = []
@@ -54,6 +31,37 @@ PrivateTest_y = []
 
 def xrange(x):
     return iter(range(x))
+
+
+def processFER2013ToImage(base_path, flag):
+    file = 'data/fer2013.csv'
+    with open(file, 'r') as csvin:
+        data = csv.reader(csvin)
+        for row in data:
+            if row[-1] == flag:
+                temp_list = []
+                # reshape((48, 48))
+                expression_str = expression_ind_dict[int(row[0])]
+                expression_count[expression_str] += 1
+                file_str = os.path.join(base_path+expression_str, str(expression_count[expression_str])+'.jpg')
+                file_str1 = os.path.join(base_path + expression_str, str(expression_count[expression_str]) + '_origin.jpg')
+
+                for pixel in row[1].split():
+                    temp_list.append(int(pixel))
+                I = np.asarray(temp_list)
+                test_image = I.reshape((48, 48))
+                test_image = test_image.astype(np.uint8)
+                test_image = test_image[:, :, np.newaxis]
+                test_image = np.concatenate((test_image, test_image, test_image), axis=2)
+                test_image1 = test_image
+                cv2.imwrite(file_str1, test_image1)
+                img_brightness = LuEnhance(test_image)
+                test_image1 = test_image1.astype(np.uint8)
+
+                img_brightness = img_brightness.astype(np.uint8)
+
+                cv2.imwrite(file_str, img_brightness)
+
 
 def processFER2013():
     file = 'data/fer2013.csv'
@@ -78,6 +86,7 @@ def processFER2013():
                 test_image1 = test_image1.astype(np.uint8)
 
                 img_brightness = img_brightness.astype(np.uint8)
+
                 img_brightnessBig = cv2.resize(img_brightness, (dst_resizelength, dst_resizelength))
                 # cv2.imshow('test_image', test_image1)
                 # cv2.imshow('img_brightness', img_brightness)
@@ -176,6 +185,33 @@ def processAnimate(base_path):
                     print('bonnie_Surprise')
             processAnimate(cur_string)
 
+def ReRangeTrainData(expression_key):
+    img_list_len = len(expression_list[expression_key])
+
+    train_label = [expression_dict[expression_key] for p in range(img_list_len)]
+
+    Training_y.extend(train_label)
+
+    Training_x.extend(expression_list[expression_key])
+
+def ReRangeValidateData(expression_key):
+    img_list_len = len(expression_list[expression_key])
+
+    validate_label = [expression_dict[expression_key] for p in range(img_list_len)]
+
+    PublicTest_y.extend(validate_label)
+
+    PublicTest_x.extend(expression_list[expression_key])
+
+def ReRangeTestData(expression_key):
+    img_list_len = len(expression_list[expression_key])
+
+    test_label = [expression_dict[expression_key] for p in range(img_list_len)]
+
+    PrivateTest_y.extend(test_label)
+
+    PrivateTest_x.extend(expression_list[expression_key])
+
 def ReRangeData(expression_key):
     img_list_len = len(expression_list[expression_key])
     training_index = int(img_list_len * 0.8)
@@ -203,6 +239,17 @@ def add_new_data():
     for key in expression_dict.keys():
         ReRangeData(key)
 
+def add_Train_data():
+    for key in expression_dict.keys():
+        ReRangeTrainData(key)
+
+def add_Validate_data():
+    for key in expression_dict.keys():
+        ReRangeValidateData(key)
+
+def add_Test_data():
+    for key in expression_dict.keys():
+        ReRangeTestData(key)
 
 def petchDataFromFile():
     expression_path = 'E:/work_dir/expression_database/expression_face'
@@ -303,9 +350,24 @@ def prepareSimpleDatasets():
     prepareImageDataSet(animate_path, datapath)
     clearList()
 
+def processFER2013Image():
+    train_path = 'E:/work_dir/expression_database/expression_face/FER2013/'
+    validate_path = 'E:/work_dir/expression_database/Validate_FER2013/'
+    test_path = 'E:/work_dir/expression_database/Test_FER2013/'
+    processAnimate(train_path)
+    add_Train_data()
+    clearExpList()
+    processAnimate(validate_path)
+    add_Validate_data()
+    clearExpList()
+    processAnimate(test_path)
+    add_Test_data()
+    clearExpList()
+
 def prepareSplitDatasets():
-    datapath = os.path.join('data', 'data_mixed_split.h5')
-    processFER2013()
+    global datapath
+    #processFER2013()
+    processFER2013Image()
     Jaffed_path = 'E:/work_dir/expression_database/expression_face/jaffe_face'
     processAnimate(Jaffed_path)
     add_new_data()
@@ -335,6 +397,9 @@ def prepareSplitDatasets():
     print("Save data finish!!!")
 
 if __name__ == '__main__':
+    bast_path = 'E:/work_dir/expression_database/Test_FER2013/'
+    flag = 'PrivateTest'
+    # processFER2013ToImage(bast_path, flag)
     prepareSplitDatasets()
     #prepareSimpleDatasets()
 
