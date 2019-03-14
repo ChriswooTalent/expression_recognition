@@ -70,6 +70,21 @@ class ShortCutBlock(nn.Module):
 #
 #         return out
 
+class PoolingBlock(nn.Module):
+    def __init__(self, ksize=3, stride=1, prelu=False):
+        super(PoolingBlock, self).__init__()
+        self.pooling = nn.MaxPool2d(ksize, stride=stride, padding=1)
+        if prelu:
+            self.relu = nn.PReLU()
+        else:
+            self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        out = self.pooling(x)
+        out = self.relu(out)
+
+        return out
+
 class MergeBlock(nn.Module):
     def __init__(self, inplanes, temp_planes, planes, ksize1=3, ksize2=1, stride=1, prelu=False):
         super(MergeBlock, self).__init__()
@@ -148,21 +163,25 @@ class MobileResNet(nn.Module):
         self.dw3_2 = block(128 * widen_factor, 256 * widen_factor, stride=2, prelu=prelu)
 
         self.dw4_1 = block(256 * widen_factor, 256 * widen_factor, prelu=prelu)
-        self.merge1 = MergeBlock(256 * widen_factor, 128 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
-                                 stride=4, prelu=prelu)
+        # self.pooling1 = PoolingBlock(ksize=3, stride=4, prelu=prelu)
+        # self.merge1 = MergeBlock(256 * widen_factor, 256 * widen_factor, 512 * widen_factor, ksize1=3, ksize2=1,
+        #                          stride=4, prelu=prelu)
         self.dw4_2 = block(256 * widen_factor, 512 * widen_factor, stride=2, prelu=prelu)
 
         self.dw5_1 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
-        self.merge2 = MergeBlock(512 * widen_factor, 256 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
-                                 stride=2, prelu=prelu)
+        # self.merge2 = MergeBlock(512 * widen_factor, 512 * widen_factor, 512 * widen_factor, ksize1=3, ksize2=1,
+        #                          stride=2, prelu=prelu)
+        # self.pooling2 = PoolingBlock(ksize=3, stride=2, prelu=prelu)
         self.dw5_2 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
         self.dw5_3 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
-        self.merge3 = MergeBlock(512 * widen_factor, 256 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
-                                 stride=2, prelu=prelu)
+        self.merge3 = MergeBlock(512 * widen_factor, 256 * widen_factor, 512 * widen_factor, ksize1=3, ksize2=1,
+                                  stride=2, prelu=prelu)
+        # self.pooling3 = PoolingBlock(ksize=3, stride=2, prelu=prelu)
         self.dw5_4 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
         self.dw5_5 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
-        self.merge4 = MergeBlock(512 * widen_factor, 256 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
-                                 stride=2, prelu=prelu)
+        self.merge4 = MergeBlock(512 * widen_factor, 256 * widen_factor, 512 * widen_factor, ksize1=3, ksize2=1,
+                                  stride=2, prelu=prelu)
+        # self.pooling4 = PoolingBlock(ksize=3, stride=2, prelu=prelu)
         self.dw5_6 = block(512 * widen_factor, 1024 * widen_factor, stride=2, prelu=prelu)
 
         #self.res_1 = ShortCutBlock(128 * widen_factor, 1024 * widen_factor, stride=1)
@@ -190,22 +209,30 @@ class MobileResNet(nn.Module):
         x = self.dw3_1(x)
         x = self.dw3_2(x)
         x = self.dw4_1(x)
-        res_input1 = self.merge1(x)
+        #pool_result1 = self.pooling1(x)
+        #res_input1 = self.merge1(x)
         x = self.dw4_2(x)
 
         x = self.dw5_1(x)
-        res_input2 = self.merge2(x)
+        # res_input2 = self.merge2(x)
+        #pool_result2 = self.pooling2(x)
         x = self.dw5_2(x)
         x = self.dw5_3(x)
         res_input3 = self.merge3(x)
+        #pool_result3 = self.pooling3(x)
         x = self.dw5_4(x)
         x = self.dw5_5(x)
         res_input4 = self.merge4(x)
+        # pool_result4 = self.pooling4(x)
         x = self.dw5_6(x)
 
-        res_output = torch.cat((res_input1, res_input2), 1)
-        res_output = torch.cat((res_output, res_input3), 1)
-        res_output = torch.cat((res_output, res_input4), 1)
+        res_output = torch.cat((res_input3, res_input4), 1)
+        # res_output = torch.cat((res_output, res_input4), 1)
+        #res_output = torch.cat((res_output, res_input4), 1)
+
+        # res_output = torch.cat((pool_result1, pool_result2), 1)
+        # res_output = torch.cat((res_output, pool_result3), 1)
+        # res_output = torch.cat((res_output, pool_result4), 1)
 
         x = self.dw6(x)
         cat_output = torch.cat((res_output, x), 1)

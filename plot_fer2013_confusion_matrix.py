@@ -18,21 +18,21 @@ from torch.autograd import Variable
 import torchvision
 import transforms as transforms
 from sklearn.metrics import confusion_matrix
-from mobilenet_v1 import mobilenet, MobileNet
+from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
 from models import *
 
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobileNet_V1', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobileResNet_v1', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--split', type=str, default='PrivateTest', help='split')
 opt = parser.parse_args()
 
 # data_file = './data/data_mixed.h5'
-# t_length = 74925
+# t_length = 74920
 # v_length = 9366
-# te_length = 9369
+# te_length = 9374
 # re_length = 96
 
 data_file = './data/Fer2013.h5'
@@ -42,6 +42,8 @@ te_length = 3589
 re_length = 96
 
 cut_size = 90
+
+file_str = os.path.join('FER2013_mobileResNet_v1/88.23', 'PublicTest_model.t7')
 
 transform_test = transforms.Compose([
     transforms.TenCrop(cut_size),
@@ -89,17 +91,19 @@ class_names = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral'
 # Model
 if opt.model == 'VGG19':
     net = VGG('VGG19')
-elif opt.model  == 'Resnet18':
+elif opt.model == 'Resnet18':
     net = ResNet18()
 elif opt.model == 'mobileNet_V1':
     net = mobilenet(num_classes=7)
+elif opt.model == 'mobileNet_05':
+    net = mobilenet_05(num_classes=7)
 elif opt.model == 'mobileResNet_v1':
     net = mobileResnet(num_classes=7)
 
 path = os.path.join(opt.dataset + '_' + opt.model)
 #checkpoint = torch.load(os.path.join('FER2013_mobileNet_V1/model_acc88.30', 'PrivateTest_model.t7'))
 
-checkpoint = torch.load(os.path.join('FER2013_mobileNet_V1/models_warmup_0304', 'PrivateTest_model.t7'))
+checkpoint = torch.load(file_str)
 #checkpoint = torch.load(os.path.join(path, opt.split + '_model.t7'))
 
 net.load_state_dict(checkpoint['net'])
@@ -142,5 +146,5 @@ np.set_printoptions(precision=2)
 plt.figure(figsize=(10, 8))
 plot_confusion_matrix(matrix, classes=class_names, normalize=True,
                       title= opt.split+' Confusion Matrix (Accuracy: %0.3f%%)' %acc)
-plt.savefig(os.path.join(path, opt.split + '_cm_Fer2013old.png'))
+plt.savefig(os.path.join(path, opt.split + '_mobile_private.png'))
 plt.close()

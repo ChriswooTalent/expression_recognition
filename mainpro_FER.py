@@ -15,20 +15,28 @@ import os
 import argparse
 from fer import FER2013
 import utils
+from mobilenetv2 import mobilenetv2
 from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
 from torch.autograd import Variable
 from models import *
 
-data_file = './data/data.h5'
-# t_length = 74925
-# v_length = 9366
-# te_length = 9369
+data_file = './data/data_mixed_split.h5'
+t_length = 74920
+v_length = 9366
+te_length = 9374
+re_length = 96
 
-t_length = 28709
-v_length = 3589
-te_length = 3589
-re_length = 48
+# data_file = './data/data.h5'
+# # t_length = 74925
+# # v_length = 9366
+# # te_length = 9369
+# # re_length = 48
+#
+# t_length = 28709
+# v_length = 3589
+# te_length = 3589
+# re_length = 48
 
 training_loss = []
 validation_loss = []
@@ -39,7 +47,7 @@ validation_acc = []
 test_acc = []
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobileResNet_v1', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobilenetv2', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--bs', default=64, type=int, help='learning rate')
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
@@ -59,7 +67,7 @@ learning_rate_decay_start = 30  # 50
 learning_rate_decay_every = 5 # 5
 learning_rate_decay_rate = 0.92 # 0.9
 
-cut_size = 44
+cut_size = 90
 total_epoch = 220
 
 path = os.path.join(opt.dataset + '_' + opt.model)
@@ -67,7 +75,7 @@ path = os.path.join(opt.dataset + '_' + opt.model)
 # Data
 print('==> Preparing data..')
 transform_train = transforms.Compose([
-    transforms.RandomCrop(cut_size),
+    # transforms.RandomCrop(cut_size),
     transforms.RandomHorizontalFlip(),
     torchvision.transforms.RandomRotation(3, resample=PIL.Image.BILINEAR),
     transforms.ToTensor(),
@@ -96,6 +104,8 @@ elif opt.model == 'mobileNet_05':
     net = mobilenet_05(num_classes=7)
 elif opt.model == 'mobileResNet_v1':
     net = mobileResnet(num_classes=7)
+elif opt.model == 'mobilenetv2':
+    net = mobilenetv2(num_classes=7, input_size=96)
 
 if opt.resume:
     # Load checkpoint.

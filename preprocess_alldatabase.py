@@ -263,6 +263,10 @@ def prepare2ImageDataSet(dirpath, dirpaht1, datapath):
 
     print("Save data finish!!!")
 
+def clearExpList():
+    for key in expression_dict.keys():
+        expression_list[key].clear()
+
 def clearList():
     global Training_x
     global Training_y
@@ -305,12 +309,15 @@ def prepareSplitDatasets():
     Jaffed_path = 'E:/work_dir/expression_database/expression_face/jaffe_face'
     processAnimate(Jaffed_path)
     add_new_data()
+    clearExpList()
     CK_path = 'E:/work_dir/expression_database/expression_face/ck_classifiy'
     processAnimate(CK_path)
     add_new_data()
+    clearExpList()
     animate_path = 'E:/work_dir/expression_database/expression_face/FERG_DB_256/FERG_DB_256'
     processAnimate(animate_path)
     add_new_data()
+    clearExpList()
 
     print(np.shape(Training_x))
     print(np.shape(PublicTest_x))
