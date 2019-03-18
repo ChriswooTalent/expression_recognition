@@ -18,13 +18,14 @@ from torch.autograd import Variable
 import torchvision
 import transforms as transforms
 from sklearn.metrics import confusion_matrix
+from mobilenetv2 import mobilenetv2
 from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
 from models import *
 
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobileResNet_v1', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobileNet_v2', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--split', type=str, default='PrivateTest', help='split')
 opt = parser.parse_args()
@@ -41,21 +42,56 @@ opt = parser.parse_args()
 # te_length = 9369
 # re_length = 100
 
-data_file = './data/data_Augmixed_split_validate.h5'
-t_length = 99541
-v_length = 9366
-te_length = 9369
-re_length = 96
-
-# data_file = './data/Fer2013.h5'
-# t_length = 28709
-# v_length = 3589
-# te_length = 3589
+# data_file = './data/data_Augmixed_split_validate.h5'
+# t_length = 99541
+# v_length = 9366
+# te_length = 9369
 # re_length = 96
 
-cut_size = 90
+# data_file = './data/data_ExpW_split.h5'
+# t_length = 88870
+# v_length = 11110
+# te_length = 11120
+# re_length = 100
 
-file_str = os.path.join('FER2013_mobileResNet_v1/88.23', 'PublicTest_model.t7')
+confusion_matrix_file = '_mobile_FER2013.png'
+data_file = os.path.join('data/split_dataset', 'FER2013_split.h5')
+t_length = 28709
+v_length = 3589
+te_length = 3589
+re_length = 100
+
+# confusion_matrix_file = '_mobile_EXPW.png'
+# data_file = os.path.join('data/split_dataset', 'ExpW.h5')
+# t_length = 42659
+# v_length = 5333
+# te_length = 5335
+# re_length = 100
+
+# confusion_matrix_file = '_mobile_Jaffe.png'
+# data_file = os.path.join('data/split_dataset', 'Jaffe.h5')
+# t_length = 168
+# v_length = 21
+# te_length = 24
+# re_length = 100
+
+# confusion_matrix_file = '_mobile_CK.png'
+# data_file = os.path.join('data/split_dataset', 'CK+_split.h5')
+# t_length = 1433
+# v_length = 179
+# te_length = 182
+# re_length = 100
+
+# confusion_matrix_file = '_mobile_animate.png'
+# data_file = os.path.join('data/split_dataset', 'animate_split.h5')
+# t_length = 44610
+# v_length = 5577
+# te_length = 5579
+# re_length = 100
+
+cut_size = 96
+
+file_str = os.path.join('FER2013_mobileNet_v2', 'PublicTest_model.t7')
 
 transform_test = transforms.Compose([
     transforms.TenCrop(cut_size),
@@ -111,6 +147,8 @@ elif opt.model == 'mobileNet_05':
     net = mobilenet_05(num_classes=7)
 elif opt.model == 'mobileResNet_v1':
     net = mobileResnet(num_classes=7)
+elif opt.model == 'mobileNet_v2':
+    net = mobilenetv2(num_classes=7, input_size=96)
 
 path = os.path.join(opt.dataset + '_' + opt.model)
 #checkpoint = torch.load(os.path.join('FER2013_mobileNet_V1/model_acc88.30', 'PrivateTest_model.t7'))
@@ -158,5 +196,5 @@ np.set_printoptions(precision=2)
 plt.figure(figsize=(10, 8))
 plot_confusion_matrix(matrix, classes=class_names, normalize=True,
                       title= opt.split+' Confusion Matrix (Accuracy: %0.3f%%)' %acc)
-plt.savefig(os.path.join(path, opt.split + '_mobile_private.png'))
+plt.savefig(os.path.join(path, opt.split + confusion_matrix_file))
 plt.close()

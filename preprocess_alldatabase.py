@@ -7,8 +7,8 @@ import h5py
 import cv2
 from ImageEnhance import *
 
-dst_resizelength = 96
-datapath = os.path.join('data', 'data_Augmixed_split_validate.h5')
+dst_resizelength = 100
+datapath = os.path.join('data', 'FER2013_split.h5')
 
 expression_dict = {'Angry': 0, 'Disgust': 1, 'Fear': 2, 'Happy': 3, 'Sad': 4, 'Surprise': 5, 'Neutral': 6}
 
@@ -20,6 +20,7 @@ expression_count = {'Angry': 0, 'Disgust': 0, 'Fear': 0, 'Happy': 0, 'Sad': 0, '
 
 subpath = '0'
 animate_label_list = []
+
 
 # Creat the list to store the data and label information
 Training_x = []
@@ -364,10 +365,54 @@ def processFER2013Image():
     add_Test_data()
     clearExpList()
 
+def GenSimpleDatasets():
+    print('Exp Wild')
+    wild_path = 'E:/work_dir/expression_database/expression_face/ExpW'
+    wild_cfile = os.path.join('data', 'ExpW.h5')
+    generateSimpleDatasets(wild_path, wild_cfile)
+    print('jaffe_face')
+    Jaffed_path = 'E:/work_dir/expression_database/expression_face/jaffe_face'
+    Jaffed_cfile = os.path.join('data', 'Jaffe.h5')
+    generateSimpleDatasets(Jaffed_path, Jaffed_cfile)
+    print('CK+')
+    CK_path = 'E:/work_dir/expression_database/expression_face/ck_classifiy'
+    ck_cfile = os.path.join('data', 'CK+_split.h5')
+    generateSimpleDatasets(CK_path, ck_cfile)
+    print('animate')
+    animate_path = 'E:/work_dir/expression_database/expression_face/FERG_DB_256/FERG_DB_256'
+    animate_cfile = os.path.join('data', 'animate_split.h5')
+    generateSimpleDatasets(animate_path, animate_cfile)
+
+    print("Save data finish!!!")
+
+
+def generateSimpleDatasets(images_path, savefile_path):
+    processAnimate(images_path)
+    add_new_data()
+    print(np.shape(Training_x))
+    print(np.shape(PublicTest_x))
+    print(np.shape(PrivateTest_x))
+
+    datafile = h5py.File(savefile_path, 'w')
+    datafile.create_dataset("Training_pixel", dtype = 'uint8', data=Training_x)
+    datafile.create_dataset("Training_label", dtype = 'int64', data=Training_y)
+    datafile.create_dataset("PublicTest_pixel", dtype = 'uint8', data=PublicTest_x)
+    datafile.create_dataset("PublicTest_label", dtype = 'int64', data=PublicTest_y)
+    datafile.create_dataset("PrivateTest_pixel", dtype = 'uint8', data=PrivateTest_x)
+    datafile.create_dataset("PrivateTest_label", dtype = 'int64', data=PrivateTest_y)
+    datafile.close()
+
+    print("Save data finish!!!")
+    clearList()
+
 def prepareSplitDatasets():
     global datapath
     #processFER2013()
-    processFER2013Image()
+    #processFER2013Image()
+    wild_path = 'E:/work_dir/expression_database/expression_face/ExpW'
+    processAnimate(wild_path)
+    add_new_data()
+    clearExpList()
     Jaffed_path = 'E:/work_dir/expression_database/expression_face/jaffe_face'
     processAnimate(Jaffed_path)
     add_new_data()
@@ -397,10 +442,12 @@ def prepareSplitDatasets():
     print("Save data finish!!!")
 
 if __name__ == '__main__':
-    bast_path = 'E:/work_dir/expression_database/Test_FER2013/'
-    flag = 'PrivateTest'
+    # GenSimpleDatasets()
     # processFER2013ToImage(bast_path, flag)
-    prepareSplitDatasets()
+    #prepareSplitDatasets()
+
+
+
     #prepareSimpleDatasets()
 
     # datapath = os.path.join('data', 'data_mixed_128.h5')
@@ -414,18 +461,18 @@ if __name__ == '__main__':
     # # processAnimate(CK_path)
     # add_new_data()
     #
+    processFER2013()
+    print(np.shape(Training_x))
+    print(np.shape(PublicTest_x))
+    print(np.shape(PrivateTest_x))
     #
-    # print(np.shape(Training_x))
-    # print(np.shape(PublicTest_x))
-    # print(np.shape(PrivateTest_x))
+    datafile = h5py.File(datapath, 'w')
+    datafile.create_dataset("Training_pixel", dtype = 'uint8', data=Training_x)
+    datafile.create_dataset("Training_label", dtype = 'int64', data=Training_y)
+    datafile.create_dataset("PublicTest_pixel", dtype = 'uint8', data=PublicTest_x)
+    datafile.create_dataset("PublicTest_label", dtype = 'int64', data=PublicTest_y)
+    datafile.create_dataset("PrivateTest_pixel", dtype = 'uint8', data=PrivateTest_x)
+    datafile.create_dataset("PrivateTest_label", dtype = 'int64', data=PrivateTest_y)
+    datafile.close()
     #
-    # datafile = h5py.File(datapath, 'w')
-    # datafile.create_dataset("Training_pixel", dtype = 'uint8', data=Training_x)
-    # datafile.create_dataset("Training_label", dtype = 'int64', data=Training_y)
-    # datafile.create_dataset("PublicTest_pixel", dtype = 'uint8', data=PublicTest_x)
-    # datafile.create_dataset("PublicTest_label", dtype = 'int64', data=PublicTest_y)
-    # datafile.create_dataset("PrivateTest_pixel", dtype = 'uint8', data=PrivateTest_x)
-    # datafile.create_dataset("PrivateTest_label", dtype = 'int64', data=PrivateTest_y)
-    # datafile.close()
-    #
-    # print("Save data finish!!!")
+    print("Save data finish!!!")

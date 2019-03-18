@@ -18,6 +18,7 @@ import utils
 from mobilenetv2 import mobilenetv2
 from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
+from focalloss import FocalLoss
 from torch.autograd import Variable
 from models import *
 
@@ -25,7 +26,7 @@ data_file = './data/data_mixed_split.h5'
 t_length = 74920
 v_length = 9366
 te_length = 9374
-re_length = 96
+re_length = 100
 
 # data_file = './data/data.h5'
 # # t_length = 74925
@@ -129,7 +130,8 @@ else:
 if use_cuda:
     net.cuda()
 
-criterion = nn.CrossEntropyLoss()
+# criterion = nn.CrossEntropyLoss()
+criterion = FocalLoss()
 #optimizer = optim.SGD(net.parameters(), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
 optimizer = optim.SGD(net.parameters(), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
 
