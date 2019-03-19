@@ -22,17 +22,23 @@ from focalloss import FocalLoss
 from torch.autograd import Variable
 from models import *
 
-data_file = './data/data_mixed_split.h5'
-t_length = 74920
+# data_file = './data/data_mixed.h5'
+# t_length = 74925
+# v_length = 9366
+# te_length = 9369
+# re_length = 96
+
+data_file = './data/data_pretrain.h5'
+t_length = 99540
 v_length = 9366
-te_length = 9374
+te_length = 9369
 re_length = 100
 
-# data_file = './data/data.h5'
-# # t_length = 74925
-# # v_length = 9366
-# # te_length = 9369
-# # re_length = 48
+# data_file = './data/data_wild.h5'
+# t_length = 144747
+# v_length = 15017
+# te_length = 15023
+# re_length = 100
 #
 # t_length = 28709
 # v_length = 3589
@@ -48,13 +54,13 @@ validation_acc = []
 test_acc = []
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobilenetv2', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobileResNet_v1', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--bs', default=64, type=int, help='learning rate')
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
 parser.add_argument('--warmup', default=5, type=int)
-parser.add_argument('--milestones', default='30,35,45,150,220', type=str)
+parser.add_argument('--milestones', default='25,35,45,150,220', type=str)
 opt = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
@@ -76,14 +82,14 @@ path = os.path.join(opt.dataset + '_' + opt.model)
 # Data
 print('==> Preparing data..')
 transform_train = transforms.Compose([
-    # transforms.RandomCrop(cut_size),
+    transforms.RandomCrop(cut_size),
     transforms.RandomHorizontalFlip(),
     torchvision.transforms.RandomRotation(3, resample=PIL.Image.BILINEAR),
     transforms.ToTensor(),
 ])
 
 transform_test = transforms.Compose([
-    transforms.FiveCrop(cut_size),
+    transforms.TenCrop(cut_size),
     transforms.Lambda(lambda crops: torch.stack([transforms.ToTensor()(crop) for crop in crops])),
 ])
 
@@ -127,11 +133,17 @@ if opt.resume:
 else:
     print('==> Building model..')
 
-if use_cuda:
-    net.cuda()
+# if torch.cuda.device_count() > 1:
+#     print("Let's use", torch.cuda.device_count(), "GPUs!")
+#     # torch.cuda.set_device([0,1,2,3])
+#     net = nn.DataParallel(net,device_ids=[0,1,2,3])
 
-# criterion = nn.CrossEntropyLoss()
-criterion = FocalLoss()
+
+if use_cuda:
+    net = net.cuda()
+
+criterion = nn.CrossEntropyLoss()
+#criterion = FocalLoss()
 #optimizer = optim.SGD(net.parameters(), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
 optimizer = optim.SGD(net.parameters(), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
 
@@ -141,7 +153,7 @@ def write_result_to_file(result_list, filename):
     for item in result_list:
         result_file.write("%s " % item)
         if ((file_count > 0) and (file_count % 10 == 0)):
-            f.write('\n')
+            result_file.write('\n')
         file_count += 1
     result_file.close()
 
@@ -171,15 +183,15 @@ def adjust_learning_rate(optimizer, epoch, milestones=None):
         cur_lr = opt.lr * (0.2 ** n)
 
     if epoch <= opt.warmup:
-        cur_lr = 0.000001
+        cur_lr = 0.00001
     if temp_milestone[0] < epoch <= temp_milestone[1]:
-        cur_lr = 0.0001*(decayfactor ** (epoch-temp_milestone[0]-1))
+        cur_lr = 0.001*(1.0 ** (epoch-temp_milestone[0]-1))
     if temp_milestone[1] < epoch <= temp_milestone[2]:
-        cur_lr = 0.00005*(decayfactor ** (epoch-temp_milestone[1]-1))
+        cur_lr = 0.0005*(decayfactor ** (epoch-temp_milestone[1]-1))
     if temp_milestone[2] < epoch <= temp_milestone[3]:
-            cur_lr = 0.00001*(decayfactor ** (epoch-temp_milestone[2]-1))
+            cur_lr = 0.0001*(decayfactor ** (epoch-temp_milestone[2]-1))
     if temp_milestone[3] < epoch <= temp_milestone[4]:
-            cur_lr = 0.000001
+            cur_lr = 0.00001
     for param_group in optimizer.param_groups:
         param_group['lr'] = cur_lr
     return cur_lr
@@ -207,7 +219,7 @@ def train_warmup(epoch):
         loss.backward()
         utils.clip_gradient(optimizer, 0.1)
         optimizer.step()
-        train_loss += loss.data[0]
+        train_loss += loss.item()
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
@@ -253,7 +265,7 @@ def train(epoch):
         loss.backward()
         utils.clip_gradient(optimizer, 0.1)
         optimizer.step()
-        train_loss += loss.data[0]
+        train_loss += loss.item()
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
@@ -294,7 +306,7 @@ def PublicTest(epoch):
         outputs = net(inputs)
         outputs_avg = outputs.view(bs, ncrops, -1).mean(1)  # avg over crops
         loss = criterion(outputs_avg, targets)
-        PublicTest_loss += loss.data[0]
+        PublicTest_loss += loss.item()
         _, predicted = torch.max(outputs_avg.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
@@ -339,7 +351,7 @@ def PrivateTest(epoch):
         outputs = net(inputs)
         outputs_avg = outputs.view(bs, ncrops, -1).mean(1)  # avg over crops
         loss = criterion(outputs_avg, targets)
-        PrivateTest_loss += loss.data[0]
+        PrivateTest_loss += loss.item()
         _, predicted = torch.max(outputs_avg.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
@@ -368,8 +380,8 @@ def PrivateTest(epoch):
         best_PrivateTest_acc_epoch = epoch
 
 for epoch in range(start_epoch, total_epoch):
-    train(epoch)
-    #train_warmup(epoch)
+    #train(epoch)
+    train_warmup(epoch)
     PublicTest(epoch)
     PrivateTest(epoch)
     # write_result_to_file(training_loss, 'loss/train_loss.txt')

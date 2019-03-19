@@ -86,29 +86,20 @@ class PoolingBlock(nn.Module):
         return out
 
 class MergeBlock(nn.Module):
-    def __init__(self, inplanes, temp_planes, planes, ksize1=3, ksize2=1, stride=1, prelu=False):
+    def __init__(self, inplanes, planes, ksize1=3, ksize2=1, stride=1, prelu=False):
         super(MergeBlock, self).__init__()
         inplanes, planes = int(inplanes), int(planes)
-        self.conv_dw = nn.Conv2d(inplanes, int(temp_planes), kernel_size=ksize1, padding=1, stride=stride, groups=int(temp_planes),
+        temp_planes = int(inplanes/2)
+        self.conv_1 = nn.Conv2d(inplanes, temp_planes, kernel_size=ksize2, padding=0, stride=stride, groups=1,
                                  bias=False)
-        self.bn_dw = nn.BatchNorm2d(int(temp_planes))
-        self.conv_sep = nn.Conv2d(int(temp_planes), planes, kernel_size=ksize2, stride=1, padding=0, bias=False)
-        self.bn_sep = nn.BatchNorm2d(planes)
-        if prelu:
-            self.relu = nn.PReLU()
-        else:
-            self.relu = nn.ReLU(inplace=True)
+        self.conv_2 = nn.Conv2d(temp_planes, planes, kernel_size=ksize1, padding=1, stride=1, groups=1,
+                                 bias=False)
 
     def forward(self, x):
-        out = self.conv_dw(x)
-        out = self.bn_dw(out)
-        out = self.relu(out)
+        blk = self.conv_1(x)
+        blk = self.conv_2(blk)
 
-        out = self.conv_sep(out)
-        out = self.bn_sep(out)
-        out = self.relu(out)
-
-        return out
+        return blk
 
 class DepthWiseBlock(nn.Module):
     def __init__(self, inplanes, planes, stride=1, prelu=False):
@@ -164,22 +155,22 @@ class MobileResNet(nn.Module):
 
         self.dw4_1 = block(256 * widen_factor, 256 * widen_factor, prelu=prelu)
         self.pooling1 = PoolingBlock(ksize=3, stride=4, prelu=prelu)
-        self.merge1 = MergeBlock(256 * widen_factor, 128 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
-                                  stride=4, prelu=prelu)
+        # self.merge1 = MergeBlock(256 * widen_factor, 128 * widen_factor, 256 * widen_factor, ksize1=3, ksize2=1,
+        #                           stride=4, prelu=prelu)
         self.dw4_2 = block(256 * widen_factor, 512 * widen_factor, stride=2, prelu=prelu)
 
         self.dw5_1 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
-        self.merge2 = MergeBlock(512 * widen_factor, 256 * widen_factor, 512 * widen_factor, ksize1=3, ksize2=1,
+        self.merge2 = MergeBlock(512 * widen_factor, 1024 * widen_factor, ksize1=3, ksize2=1,
                                   stride=2, prelu=prelu)
         # self.pooling2 = PoolingBlock(ksize=3, stride=2, prelu=prelu)
         self.dw5_2 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
         self.dw5_3 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
-        self.merge3 = MergeBlock(512 * widen_factor, 256 * widen_factor, 512 * widen_factor, ksize1=3, ksize2=1,
+        self.merge3 = MergeBlock(512 * widen_factor, 1024 * widen_factor, ksize1=3, ksize2=1,
                                   stride=2, prelu=prelu)
         # self.pooling3 = PoolingBlock(ksize=3, stride=2, prelu=prelu)
         self.dw5_4 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
         self.dw5_5 = block(512 * widen_factor, 512 * widen_factor, prelu=prelu)
-        self.merge4 = MergeBlock(512 * widen_factor, 256 * widen_factor, 512 * widen_factor, ksize1=3, ksize2=1,
+        self.merge4 = MergeBlock(512 * widen_factor, 1024 * widen_factor, ksize1=3, ksize2=1,
                                   stride=2, prelu=prelu)
         # self.pooling4 = PoolingBlock(ksize=3, stride=2, prelu=prelu)
         self.dw5_6 = block(512 * widen_factor, 1024 * widen_factor, stride=2, prelu=prelu)
@@ -188,8 +179,10 @@ class MobileResNet(nn.Module):
 
         self.dw6 = block(1024 * widen_factor, 1024 * widen_factor, prelu=prelu)
 
+        self.Resrelu = nn.ReLU(inplace=True)
+
         self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(int(2816 * widen_factor), num_classes)
+        self.fc = nn.Linear(int(1024 * widen_factor), num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -210,7 +203,7 @@ class MobileResNet(nn.Module):
         x = self.dw3_2(x)
         x = self.dw4_1(x)
         #pool_result1 = self.pooling1(x)
-        res_input1 = self.merge1(x)
+        # res_input1 = self.merge1(x)
         x = self.dw4_2(x)
 
         x = self.dw5_1(x)
@@ -226,17 +219,19 @@ class MobileResNet(nn.Module):
         # pool_result4 = self.pooling4(x)
         x = self.dw5_6(x)
 
-        res_output = torch.cat((res_input1, res_input2), 1)
-        res_output = torch.cat((res_output, res_input3), 1)
-        res_output = torch.cat((res_output, res_input4), 1)
+        # res_output = torch.cat((res_input1, res_input2), 1)
+        # res_output = torch.cat((res_output, res_input3), 1)
+        # res_output = torch.cat((res_output, res_input4), 1)
 
         # res_output = torch.cat((pool_result1, pool_result2), 1)
         # res_output = torch.cat((res_output, pool_result3), 1)
         # res_output = torch.cat((res_output, pool_result4), 1)
 
+        res_output = res_input2+res_input3+res_input4
+        res_output = self.Resrelu(res_output)
         x = self.dw6(x)
-        #cat_output = res_output+x
-        cat_output = torch.cat((res_output, x), 1)
+        cat_output = res_output+x
+        #cat_output = torch.cat((res_output, x), 1)
 
         x = self.avgpool(cat_output)
         x = x.view(x.size(0), -1)

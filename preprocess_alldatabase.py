@@ -8,7 +8,7 @@ import cv2
 from ImageEnhance import *
 
 dst_resizelength = 100
-datapath = os.path.join('data', 'FER2013_split.h5')
+datapath = os.path.join('data', 'data_wild.h5')
 
 expression_dict = {'Angry': 0, 'Disgust': 1, 'Fear': 2, 'Happy': 3, 'Sad': 4, 'Surprise': 5, 'Neutral': 6}
 
@@ -182,8 +182,6 @@ def processAnimate(base_path):
             cur_string = os.path.join(base_path, x)
             if os.path.isdir(cur_string):
                 subpath = x
-                if subpath == 'bonnie_Surprise':
-                    print('bonnie_Surprise')
             processAnimate(cur_string)
 
 def ReRangeTrainData(expression_key):
@@ -366,22 +364,22 @@ def processFER2013Image():
     clearExpList()
 
 def GenSimpleDatasets():
-    print('Exp Wild')
-    wild_path = 'E:/work_dir/expression_database/expression_face/ExpW'
-    wild_cfile = os.path.join('data', 'ExpW.h5')
-    generateSimpleDatasets(wild_path, wild_cfile)
+    # print('Exp Wild')
+    # wild_path = 'E:/work_dir/expression_database/expression_face/ExpW'
+    # wild_cfile = os.path.join('data', 'ExpW.h5')
+    # generateSimpleDatasets(wild_path, wild_cfile)
     print('jaffe_face')
     Jaffed_path = 'E:/work_dir/expression_database/expression_face/jaffe_face'
     Jaffed_cfile = os.path.join('data', 'Jaffe.h5')
     generateSimpleDatasets(Jaffed_path, Jaffed_cfile)
-    print('CK+')
-    CK_path = 'E:/work_dir/expression_database/expression_face/ck_classifiy'
-    ck_cfile = os.path.join('data', 'CK+_split.h5')
-    generateSimpleDatasets(CK_path, ck_cfile)
-    print('animate')
-    animate_path = 'E:/work_dir/expression_database/expression_face/FERG_DB_256/FERG_DB_256'
-    animate_cfile = os.path.join('data', 'animate_split.h5')
-    generateSimpleDatasets(animate_path, animate_cfile)
+    # print('CK+')
+    # CK_path = 'E:/work_dir/expression_database/expression_face/ck_classifiy'
+    # ck_cfile = os.path.join('data', 'CK+_split.h5')
+    # generateSimpleDatasets(CK_path, ck_cfile)
+    # print('animate')
+    # animate_path = 'E:/work_dir/expression_database/expression_face/FERG_DB_256/FERG_DB_256'
+    # animate_cfile = os.path.join('data', 'animate_split.h5')
+    # generateSimpleDatasets(animate_path, animate_cfile)
 
     print("Save data finish!!!")
 
@@ -407,23 +405,39 @@ def generateSimpleDatasets(images_path, savefile_path):
 
 def prepareSplitDatasets():
     global datapath
-    #processFER2013()
-    #processFER2013Image()
+    # processFER2013()
+    processFER2013Image()
+    print(np.shape(Training_x))
+    print(np.shape(PublicTest_x))
+    print(np.shape(PrivateTest_x))
+
     wild_path = 'E:/work_dir/expression_database/expression_face/ExpW'
     processAnimate(wild_path)
     add_new_data()
+    print(np.shape(Training_x))
+    print(np.shape(PublicTest_x))
+    print(np.shape(PrivateTest_x))
     clearExpList()
     Jaffed_path = 'E:/work_dir/expression_database/expression_face/jaffe_face'
     processAnimate(Jaffed_path)
     add_new_data()
+    print(np.shape(Training_x))
+    print(np.shape(PublicTest_x))
+    print(np.shape(PrivateTest_x))
     clearExpList()
     CK_path = 'E:/work_dir/expression_database/expression_face/ck_classifiy'
     processAnimate(CK_path)
     add_new_data()
+    print(np.shape(Training_x))
+    print(np.shape(PublicTest_x))
+    print(np.shape(PrivateTest_x))
     clearExpList()
     animate_path = 'E:/work_dir/expression_database/expression_face/FERG_DB_256/FERG_DB_256'
     processAnimate(animate_path)
     add_new_data()
+    print(np.shape(Training_x))
+    print(np.shape(PublicTest_x))
+    print(np.shape(PrivateTest_x))
     clearExpList()
 
     print(np.shape(Training_x))
@@ -442,12 +456,9 @@ def prepareSplitDatasets():
     print("Save data finish!!!")
 
 if __name__ == '__main__':
-    # GenSimpleDatasets()
+    #GenSimpleDatasets()
     # processFER2013ToImage(bast_path, flag)
-    #prepareSplitDatasets()
-
-
-
+    prepareSplitDatasets()
     #prepareSimpleDatasets()
 
     # datapath = os.path.join('data', 'data_mixed_128.h5')
@@ -461,18 +472,18 @@ if __name__ == '__main__':
     # # processAnimate(CK_path)
     # add_new_data()
     #
-    processFER2013()
-    print(np.shape(Training_x))
-    print(np.shape(PublicTest_x))
-    print(np.shape(PrivateTest_x))
-    #
-    datafile = h5py.File(datapath, 'w')
-    datafile.create_dataset("Training_pixel", dtype = 'uint8', data=Training_x)
-    datafile.create_dataset("Training_label", dtype = 'int64', data=Training_y)
-    datafile.create_dataset("PublicTest_pixel", dtype = 'uint8', data=PublicTest_x)
-    datafile.create_dataset("PublicTest_label", dtype = 'int64', data=PublicTest_y)
-    datafile.create_dataset("PrivateTest_pixel", dtype = 'uint8', data=PrivateTest_x)
-    datafile.create_dataset("PrivateTest_label", dtype = 'int64', data=PrivateTest_y)
-    datafile.close()
-    #
-    print("Save data finish!!!")
+    # processFER2013()
+    # print(np.shape(Training_x))
+    # print(np.shape(PublicTest_x))
+    # print(np.shape(PrivateTest_x))
+    # #
+    # datafile = h5py.File(datapath, 'w')
+    # datafile.create_dataset("Training_pixel", dtype = 'uint8', data=Training_x)
+    # datafile.create_dataset("Training_label", dtype = 'int64', data=Training_y)
+    # datafile.create_dataset("PublicTest_pixel", dtype = 'uint8', data=PublicTest_x)
+    # datafile.create_dataset("PublicTest_label", dtype = 'int64', data=PublicTest_y)
+    # datafile.create_dataset("PrivateTest_pixel", dtype = 'uint8', data=PrivateTest_x)
+    # datafile.create_dataset("PrivateTest_label", dtype = 'int64', data=PrivateTest_y)
+    # datafile.close()
+    # #
+    # print("Save data finish!!!")

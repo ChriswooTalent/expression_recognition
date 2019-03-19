@@ -23,9 +23,10 @@ from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
 from models import *
 
-
+modelfile_dict = {'mobileResNet_v1': 'FER2013_mobileResNet_v1', 'mobileNet_V1': 'FER2013_mobileNet_V1',
+                  'mobileNet_05': 'FER2013_mobilenet_05', 'mobileNet_v2': 'FER2013_mobileNet_v2'}
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobileNet_v2', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobileResNet_v1', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--split', type=str, default='PrivateTest', help='split')
 opt = parser.parse_args()
@@ -54,19 +55,19 @@ opt = parser.parse_args()
 # te_length = 11120
 # re_length = 100
 
-confusion_matrix_file = '_mobile_FER2013.png'
-data_file = os.path.join('data/split_dataset', 'FER2013_split.h5')
-t_length = 28709
-v_length = 3589
-te_length = 3589
-re_length = 100
-
-# confusion_matrix_file = '_mobile_EXPW.png'
-# data_file = os.path.join('data/split_dataset', 'ExpW.h5')
-# t_length = 42659
-# v_length = 5333
-# te_length = 5335
+# confusion_matrix_file = '_mobile_FER2013.png'
+# data_file = os.path.join('data/split_dataset', 'FER2013_split.h5')
+# t_length = 28709
+# v_length = 3589
+# te_length = 3589
 # re_length = 100
+
+confusion_matrix_file = '_mobile_EXPW.png'
+data_file = os.path.join('data/split_dataset', 'ExpW.h5')
+t_length = 42659
+v_length = 5333
+te_length = 5335
+re_length = 100
 
 # confusion_matrix_file = '_mobile_Jaffe.png'
 # data_file = os.path.join('data/split_dataset', 'Jaffe.h5')
@@ -91,7 +92,7 @@ re_length = 100
 
 cut_size = 96
 
-file_str = os.path.join('FER2013_mobileNet_v2', 'PublicTest_model.t7')
+file_str = os.path.join(modelfile_dict[opt.model], 'PrivateTest_model.t7')
 
 transform_test = transforms.Compose([
     transforms.TenCrop(cut_size),
