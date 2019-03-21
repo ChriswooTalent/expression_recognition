@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,7 +9,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from CenterLoss import CenterLoss
 import matplotlib.pyplot as plt
 
-
+os.environ["CUDA_VISIVLE_DEVICES"] = '1'
 
 class Net(nn.Module):
     def __init__(self):
@@ -44,6 +45,7 @@ class Net(nn.Module):
         ip2 = self.ip2(ip1)
         return ip1, F.log_softmax(ip2, dim=1)
 
+torch.cuda.set_device(1)
 use_cuda = torch.cuda.is_available() and True
 device = torch.device("cuda" if use_cuda else "cpu")
 # Dataset
@@ -60,13 +62,13 @@ trainset1 = datasets.MNIST('../MNIST', download=True, train=True, transform = No
 train_loader = DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4)
 
 # Model
-model = Net().to(device)
+model = Net().cuda()
 
 # NLLLoss
-nllloss = nn.NLLLoss().to(device) #CrossEntropyLoss = log_softmax + NLLLoss
+nllloss = nn.NLLLoss().cuda() #CrossEntropyLoss = log_softmax + NLLLoss
 # CenterLoss
 loss_weight = 1
-centerloss = CenterLoss(10, 2).to(device)
+centerloss = CenterLoss(10, 2).cuda()
 
 # optimzer4nn
 optimizer4nn = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
@@ -84,8 +86,8 @@ def visualize(feat, labels, epoch):
     for i in range(10):
         plt.plot(feat[labels == i, 0], feat[labels == i, 1], '.', c=c[i])
     plt.legend(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], loc = 'upper right')
-    plt.xlim(xmin=-8, xmax=8)
-    plt.ylim(ymin=-8, ymax=8)
+    plt.xlim(xmin=-800, xmax=800)
+    plt.ylim(ymin=-800, ymax=800)
     plt.text(-7.8,7.3,"epoch=%d" % epoch)
     plt.savefig('./images/epoch=%d.jpg' % epoch)
     plt.draw()
@@ -97,18 +99,20 @@ def train(epoch):
     ip1_loader = []
     idx_loader = []
     for i, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
+        data, target = data.cuda(), target.cuda()
 
         ip1, pred = model(data)
-        loss = nllloss(pred, target) + loss_weight * centerloss(target, ip1)
+        # loss = nllloss(pred, target) + loss_weight * centerloss(target, ip1)
+
+        loss = nllloss(pred, target)
 
         optimizer4nn.zero_grad()
-        optimzer4center.zero_grad()
+        # optimzer4center.zero_grad()
 
         loss.backward()
 
         optimizer4nn.step()
-        optimzer4center.step()
+        # optimzer4center.step()
 
         ip1_loader.append(ip1)
         idx_loader.append((target))
@@ -116,21 +120,6 @@ def train(epoch):
     feat = torch.cat(ip1_loader, 0)
     labels = torch.cat(idx_loader, 0)
     visualize(feat.data.cpu().numpy(), labels.data.cpu().numpy(), epoch)
-
-
-
-# trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
-# train_set = datasets.MNIST(root='../MNIST', train=True, transform=trans)
-# test_set = datasets.MNIST(root='../MNIST', train=False, transform=trans)
-# batch_size = 128
-# train_loader = torch.utils.data.DataLoader(
-#                  dataset=train_set,
-#                  batch_size=batch_size,
-#                  shuffle=True)
-# test_loader = torch.utils.data.DataLoader(
-#                 dataset=test_set,
-#                 batch_size=batch_size,
-#                 shuffle=False)
 
 if __name__ == '__main__':
     # freeze_support()

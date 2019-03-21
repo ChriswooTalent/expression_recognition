@@ -15,12 +15,15 @@ import os
 import argparse
 from fer import FER2013
 import utils
+from mobilenetv1_centerloss import mobilenetv1CL
+from mobileResNet_CenterLoss import mobileResnetCL
 from mobilenetv2 import mobilenetv2
 from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
 from focalloss import FocalLoss
 from torch.autograd import Variable
 from models import *
+from CenterLoss import CenterLoss
 
 # data_file = './data/data_mixed.h5'
 # t_length = 74925
@@ -28,17 +31,17 @@ from models import *
 # te_length = 9369
 # re_length = 96
 
-data_file = './data/data_pretrain.h5'
-t_length = 99540
-v_length = 9366
-te_length = 9369
-re_length = 100
-
-# data_file = './data/data_wild.h5'
-# t_length = 144747
-# v_length = 15017
-# te_length = 15023
+# data_file = './data/data_pretrain.h5'
+# t_length = 99540
+# v_length = 9366
+# te_length = 9369
 # re_length = 100
+
+data_file = './data/data_wild.h5'
+t_length = 144747
+v_length = 15017
+te_length = 15023
+re_length = 100
 #
 # t_length = 28709
 # v_length = 3589
@@ -54,12 +57,13 @@ validation_acc = []
 test_acc = []
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobilenetv2', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobilev1_CL', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--bs', default=64, type=int, help='learning rate')
-parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
-parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-parser.add_argument('--warmup', default=5, type=int)
+parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
+parser.add_argument('--resume', '-r', action='store_true', default=True, help='resume from checkpoint')
+parser.add_argument('--weight_init', '-i', default=False, help='init from checkpoint')
+parser.add_argument('--warmup', default=0, type=int)
 parser.add_argument('--milestones', default='25,35,45,150,220', type=str)
 opt = parser.parse_args()
 
@@ -70,13 +74,15 @@ best_PrivateTest_acc = 0  # best PrivateTest accuracy
 best_PrivateTest_acc_epoch = 0
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
-learning_rate_decay_start = 30  # 50
+learning_rate_decay_start = 45  # 50
 learning_rate_decay_every = 5 # 5
-learning_rate_decay_rate = 0.95 # 0.9
+learning_rate_decay_rate = 0.9 # 0.9
 
 cut_size = 96
 total_epoch = 100
 
+
+weight_init_path = os.path.join('FER2013_mobilev1_CL')
 path = os.path.join(opt.dataset + '_' + opt.model)
 
 # Data
@@ -84,12 +90,12 @@ print('==> Preparing data..')
 transform_train = transforms.Compose([
     transforms.RandomCrop(cut_size),
     transforms.RandomHorizontalFlip(),
-    torchvision.transforms.RandomRotation(4, resample=PIL.Image.BILINEAR),
+    torchvision.transforms.RandomRotation(3, resample=PIL.Image.BILINEAR),
     transforms.ToTensor(),
 ])
 
 transform_test = transforms.Compose([
-    transforms.TenCrop(cut_size),
+    transforms.FiveCrop(cut_size),
     transforms.Lambda(lambda crops: torch.stack([transforms.ToTensor()(crop) for crop in crops])),
 ])
 
@@ -100,9 +106,9 @@ transform_test = transforms.Compose([
 trainset = FER2013(split = 'Training', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_train)
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=opt.bs, shuffle=True)
 PublicTestset = FER2013(split = 'PublicTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
-PublicTestloader = torch.utils.data.DataLoader(PublicTestset, batch_size=int(opt.bs/2), shuffle=False)
+PublicTestloader = torch.utils.data.DataLoader(PublicTestset, batch_size=16, shuffle=False)
 PrivateTestset = FER2013(split = 'PrivateTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
-PrivateTestloader = torch.utils.data.DataLoader(PrivateTestset, batch_size=int(opt.bs/2), shuffle=False)
+PrivateTestloader = torch.utils.data.DataLoader(PrivateTestset, batch_size=16, shuffle=False)
 
 # Model
 if opt.model == 'VGG19':
@@ -117,14 +123,24 @@ elif opt.model == 'mobileResNet_v1':
     net = mobileResnet(num_classes=7)
 elif opt.model == 'mobilenetv2':
     net = mobilenetv2(num_classes=7, input_size=96)
+elif opt.model == 'centerloss':
+    net = mobileResnetCL(num_classes=7)
+    pretrained_net = mobileResnet(num_classes=7)
+elif opt.model == 'mobilev1_CL':
+    net = mobilenetv1CL(num_classes=7)
+    pretrained_net = mobilenet(num_classes=7)
+
+model_dict = net.state_dict()
 
 if opt.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
-    assert os.path.isdir(path), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load(os.path.join(path,'PrivateTest_model.t7'))
+    assert os.path.isdir(weight_init_path), 'Error: no checkpoint directory found!'
+    file_path = os.path.join(weight_init_path,'PrivateTest_model.t7')
+    checkpoint = torch.load(file_path)
 
     net.load_state_dict(checkpoint['net'])
+
     best_PublicTest_acc = checkpoint['best_PublicTest_acc']
     best_PrivateTest_acc = checkpoint['best_PrivateTest_acc']
     best_PrivateTest_acc_epoch = checkpoint['best_PublicTest_acc_epoch']
@@ -133,19 +149,42 @@ if opt.resume:
 else:
     print('==> Building model..')
 
-# if torch.cuda.device_count() > 1:
-#     print("Let's use", torch.cuda.device_count(), "GPUs!")
-#     # torch.cuda.set_device([0,1,2,3])
-#     net = nn.DataParallel(net,device_ids=[0,1,2,3])
+if opt.weight_init:
+    # Load checkpoint.
+    print('==> Init weight from checkpoint..')
+    assert os.path.isdir(weight_init_path), 'Error: no checkpoint directory found!'
+    file_path = os.path.join(weight_init_path,'PrivateTest_model.t7')
+    checkpoint = torch.load(file_path)
 
+    pretrained_net.load_state_dict(checkpoint['net'])
+    pretrained_dict = pretrained_net.state_dict()
 
+    pretrained_dict = {k:v for k, v in pretrained_dict.items() if k in model_dict}
+
+    model_dict.update(pretrained_dict)
+    net.load_state_dict(model_dict)
+
+else:
+    print('==> Building model..')
+
+torch.cuda.set_device(3)
 if use_cuda:
-    net = net.cuda()
+    net = net.cuda(3)
 
 criterion = nn.CrossEntropyLoss()
 #criterion = FocalLoss()
 #optimizer = optim.SGD(net.parameters(), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
 optimizer = optim.SGD(net.parameters(), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
+
+
+# NLLLoss
+nllloss = nn.NLLLoss().cuda() #CrossEntropyLoss = log_softmax + NLLLoss
+# CenterLoss
+loss_weight = 1.0
+centerloss = CenterLoss(7, 1024).cuda()
+
+# optimzer4center
+optimzer4center = optim.SGD(centerloss.parameters(), lr=0.05)
 
 def write_result_to_file(result_list, filename):
     result_file = open(filename, "w")
@@ -183,13 +222,13 @@ def adjust_learning_rate(optimizer, epoch, milestones=None):
         cur_lr = opt.lr * (0.2 ** n)
 
     if epoch <= opt.warmup:
-        cur_lr = 0.00001
+        cur_lr = 0.000001
     if temp_milestone[0] < epoch <= temp_milestone[1]:
-        cur_lr = 0.001*(1.0 ** (epoch-temp_milestone[0]-1))
+        cur_lr = 0.0005*(1.0 ** (epoch-temp_milestone[0]-1))
     if temp_milestone[1] < epoch <= temp_milestone[2]:
-        cur_lr = 0.0005*(decayfactor ** (epoch-temp_milestone[1]-1))
+        cur_lr = 0.0001*(decayfactor ** (epoch-temp_milestone[1]-1))
     if temp_milestone[2] < epoch <= temp_milestone[3]:
-            cur_lr = 0.0001*(decayfactor ** (epoch-temp_milestone[2]-1))
+            cur_lr = 0.00005*(decayfactor ** (epoch-temp_milestone[2]-1))
     if temp_milestone[3] < epoch <= temp_milestone[4]:
             cur_lr = 0.00001
     for param_group in optimizer.param_groups:
@@ -213,12 +252,17 @@ def train_warmup(epoch):
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
         optimizer.zero_grad()
+        optimzer4center.zero_grad()
         inputs, targets = Variable(inputs), Variable(targets)
-        outputs = net(inputs)
-        loss = criterion(outputs, targets)
+        ip1, outputs = net(inputs)
+        loss = nllloss(outputs, targets) + loss_weight * centerloss(targets, ip1)
+
         loss.backward()
-        utils.clip_gradient(optimizer, 0.1)
+        #utils.clip_gradient(optimizer, 0.1)
+
         optimizer.step()
+        optimzer4center.step()
+
         train_loss += loss.item()
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
@@ -259,12 +303,15 @@ def train(epoch):
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
         optimizer.zero_grad()
+        optimzer4center.zero_grad()
         inputs, targets = Variable(inputs), Variable(targets)
-        outputs = net(inputs)
-        loss = criterion(outputs, targets)
+        ip1, outputs = net(inputs)
+        loss = nllloss(outputs, targets) + loss_weight * centerloss(targets, ip1)
         loss.backward()
         utils.clip_gradient(optimizer, 0.1)
         optimizer.step()
+        optimzer4center.step()
+
         train_loss += loss.item()
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
@@ -303,9 +350,10 @@ def PublicTest(epoch):
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
         inputs, targets = Variable(inputs, volatile=True), Variable(targets)
-        outputs = net(inputs)
+        ip1, outputs = net(inputs)
         outputs_avg = outputs.view(bs, ncrops, -1).mean(1)  # avg over crops
-        loss = criterion(outputs_avg, targets)
+        ip1_avg = ip1.view(bs, ncrops, -1).mean(1)
+        loss = nllloss(outputs_avg, targets) + loss_weight * centerloss(targets, ip1_avg)
         PublicTest_loss += loss.item()
         _, predicted = torch.max(outputs_avg.data, 1)
         total += targets.size(0)
@@ -348,9 +396,10 @@ def PrivateTest(epoch):
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
         inputs, targets = Variable(inputs, volatile=True), Variable(targets)
-        outputs = net(inputs)
+        ip1, outputs = net(inputs)
         outputs_avg = outputs.view(bs, ncrops, -1).mean(1)  # avg over crops
-        loss = criterion(outputs_avg, targets)
+        ip1_avg = ip1.view(bs, ncrops, -1).mean(1)
+        loss = nllloss(outputs_avg, targets) + loss_weight * centerloss(targets, ip1_avg)
         PrivateTest_loss += loss.item()
         _, predicted = torch.max(outputs_avg.data, 1)
         total += targets.size(0)

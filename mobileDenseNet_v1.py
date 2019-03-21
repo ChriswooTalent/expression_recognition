@@ -16,7 +16,7 @@ import torch
 import torch.nn as nn
 
 
-__all__ = ['mobileResnet_2', 'mobileResnet_1', 'mobileResnet_075', 'mobileResnet_05', 'mobileResnet_025']
+__all__ = ['mobileDensenet_2', 'mobileDensenet_1', 'mobileDensenet_075', 'mobileDensenet_05', 'mobileDensenet_025']
 
 
 # class ShortCutBlock(nn.HybridBlock):
@@ -44,31 +44,6 @@ class ShortCutBlock(nn.Module):
         blk = self.conv_1(x)
         blk = self.conv_2(blk)
         return blk+x_latter
-
-#
-# class CatBlock(nn.Module):
-#     def __init__(self, cat_axis):
-#         super(CatBlock, self).__init__()
-#         self.conv_dw = nn.Conv2d(inplanes, temp_planes, kernel_size=ksize1, padding=1, stride=stride, groups=inplanes,
-#                                  bias=False)
-#         self.bn_dw = nn.BatchNorm2d(inplanes)
-#         self.conv_sep = nn.Conv2d(temp_planes, planes, kernel_size=ksize2, stride=1, padding=0, bias=False)
-#         self.bn_sep = nn.BatchNorm2d(planes)
-#         if prelu:
-#             self.relu = nn.PReLU()
-#         else:
-#             self.relu = nn.ReLU(inplace=True)
-#
-#     def forward(self, x):
-#         out = self.conv_dw(x)
-#         out = self.bn_dw(out)
-#         out = self.relu(out)
-#
-#         out = self.conv_sep(out)
-#         out = self.bn_sep(out)
-#         out = self.relu(out)
-#
-#         return out
 
 class PoolingBlock(nn.Module):
     def __init__(self, ksize=3, stride=1, prelu=False):
@@ -128,14 +103,14 @@ class DepthWiseBlock(nn.Module):
         return out
 
 
-class MobileResNet(nn.Module):
+class MobileDenseNet(nn.Module):
     def __init__(self, widen_factor=1.0, num_classes=1000, prelu=False, input_channel=3):
         """ Constructor
         Args:
             widen_factor: config of widen_factor
             num_classes: number of classes
         """
-        super(MobileResNet, self).__init__()
+        super(MobileDenseNet, self).__init__()
 
         block = DepthWiseBlock
         self.conv1 = nn.Conv2d(input_channel, int(32 * widen_factor), kernel_size=3, stride=2, padding=1,
@@ -240,7 +215,7 @@ class MobileResNet(nn.Module):
         return x
 
 
-def mobileResnet(widen_factor=1.0, num_classes=1000):
+def mobileDensenet(widen_factor=1.0, num_classes=1000):
     """
     Construct MobileNet.
     widen_factor=1.0  for mobilenet_1
@@ -248,30 +223,30 @@ def mobileResnet(widen_factor=1.0, num_classes=1000):
     widen_factor=0.5  for mobilenet_05
     widen_factor=0.25 for mobilenet_025
     """
-    model = MobileResNet(widen_factor=widen_factor, num_classes=num_classes)
+    model = MobileDenseNet(widen_factor=widen_factor, num_classes=num_classes)
     return model
 
 
-def mobileResnet_2(num_classes=62, input_channel=3):
-    model = MobileResNet(widen_factor=2.0, num_classes=num_classes, input_channel=input_channel)
+def mobileDensenet_2(num_classes=62, input_channel=3):
+    model = MobileDenseNet(widen_factor=2.0, num_classes=num_classes, input_channel=input_channel)
     return model
 
 
-def mobileResnet_1(num_classes=62, input_channel=3):
-    model = MobileResNet(widen_factor=1.0, num_classes=num_classes, input_channel=input_channel)
+def mobileDensenet_1(num_classes=62, input_channel=3):
+    model = MobileDenseNet(widen_factor=1.0, num_classes=num_classes, input_channel=input_channel)
     return model
 
 
-def mobileResnet_075(num_classes=62, input_channel=3):
-    model = MobileResNet(widen_factor=0.75, num_classes=num_classes, input_channel=input_channel)
+def mobileDensenet_075(num_classes=62, input_channel=3):
+    model = MobileDenseNet(widen_factor=0.75, num_classes=num_classes, input_channel=input_channel)
     return model
 
 
-def mobileResnet_05(num_classes=62, input_channel=3):
-    model = MobileResNet(widen_factor=0.5, num_classes=num_classes, input_channel=input_channel)
+def mobileDensenet_05(num_classes=62, input_channel=3):
+    model = MobileDenseNet(widen_factor=0.5, num_classes=num_classes, input_channel=input_channel)
     return model
 
 
-def mobileResnet_025(num_classes=62, input_channel=3):
-    model = MobileResNet(widen_factor=0.25, num_classes=num_classes, input_channel=input_channel)
+def mobileDensenet_025(num_classes=62, input_channel=3):
+    model = MobileDenseNet(widen_factor=0.25, num_classes=num_classes, input_channel=input_channel)
     return model
