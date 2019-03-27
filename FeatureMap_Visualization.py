@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
+import transforms as transforms
+
+#tsne
+from sklearn.manifold import TSNE
 
 from PIL import Image
 from skimage import io
@@ -12,17 +17,125 @@ import os
 import argparse
 from fer import FER2013
 
-from torch.autograd import Variable
-import torchvision
-import transforms as transforms
-from sklearn.metrics import confusion_matrix
-from mobilenet_v1 import mobilenet, MobileNet
+from mobilenetv1_centerloss import mobilenetv1CL
+from mobileResNet_CenterLoss import mobileResnetCL
+from mobilenetv2 import mobilenetv2
+from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
-from models import *
+from mobileDenseNet_CenterLoss import mobileDensenetCL
 import cv2
 import time
 
+modelfile_dict = {'mobileResNet_v1': 'FER2013_mobileResNet_v1', 'mobileNet_V1': 'FER2013_mobileNet_V1/model_acc88.30',
+                  'mobileNet_05': 'FER2013_mobilenet_05', 'mobileNet_v2': 'FER2013_mobileNet_v2',
+                  'centerloss':'FER2013_centerloss', 'mobilev1_CL':'FER2013_mobilev1_CL',
+                  'mobileDensev1_CL': 'FER2013_mobileDensev1_CL'}
+parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
+parser.add_argument('--model', type=str, default='mobileDensev1_CL', help='CNN architecture')
+parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
+parser.add_argument('--split', type=str, default='PrivateTest', help='split')
+opt = parser.parse_args()
+
 images_pr = 16
+
+tsne = TSNE(n_components=2, random_state=0)
+
+# data_file = os.path.join('data', 'data_enhanced_big.h5')
+# t_length = 28709
+# v_length = 3589
+# te_length = 3589
+# re_length = 96
+
+# data_file = './data/data_mixed.h5'
+# t_length = 74925
+# v_length = 9366
+# te_length = 9369
+# re_length = 96
+
+confusion_matrix_file = '_mobile_augmixed.png'
+data_file = './data/data_Augmixed_split.h5'
+t_length = 99541
+v_length = 9366
+te_length = 9369
+re_length = 100
+
+
+# confusion_matrix_file = '_mobile_FER2013.png'
+# data_file = os.path.join('data/split_dataset', 'FER2013_split.h5')
+# t_length = 53330
+# v_length = 3589
+# te_length = 3584
+# re_length = 100
+
+# confusion_matrix_file = '_mobile_CK.png'
+# data_file = os.path.join('data/split_dataset', 'CK+_split.h5')
+# t_length = 1433
+# v_length = 179
+# te_length = 182
+# re_length = 100
+
+# confusion_matrix_file = '_mobile_Jaffe.png'
+# data_file = os.path.join('data/split_dataset', 'Jaffe.h5')
+# t_length = 168
+# v_length = 21
+# te_length = 24
+# re_length = 100
+
+cut_size = 90
+
+file_str = os.path.join(modelfile_dict[opt.model], 'PrivateTest_model.t7')
+
+transform_test = transforms.Compose([
+    transforms.TenCrop(cut_size),
+    transforms.Lambda(lambda crops: torch.stack([transforms.ToTensor()(crop) for crop in crops])),
+])
+
+Testset = FER2013(split='PrivateTest', filename=data_file, train_length=t_length, validate_length=v_length,
+                  test_length=te_length, resize_length=re_length, transform=transform_test)
+Testloader = torch.utils.data.DataLoader(Testset, batch_size=1, shuffle=False)
+
+class_names = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+cpu_count = torch.cuda.device_count()
+print(cpu_count)
+GPUID = "1,2"
+GPUIDS = (len(GPUID)+1)//2
+BATCHSIZE = 20
+os.environ["CUDA_VISIBLE_DEVICES"] = GPUID
+
+# Model
+if opt.model == 'VGG19':
+    net = VGG('VGG19')
+elif opt.model  == 'Resnet18':
+    net = ResNet18()
+elif opt.model == 'mobileNet_V1':
+    net = mobilenet(num_classes=7)
+elif opt.model == 'mobileNet_05':
+    net = mobilenet_05(num_classes=7)
+elif opt.model == 'mobileResNet_v1':
+    net = mobileResnet(num_classes=7)
+elif opt.model == 'mobilenetv2':
+    net = mobilenetv2(num_classes=7, input_size=96)
+elif opt.model == 'centerloss':
+    net = mobileResnetCL(num_classes=7)
+elif opt.model == 'mobilev1_CL':
+    net = mobilenetv1CL(num_classes=7)
+elif opt.model == 'mobilenetv2_CL':
+    net = mobilenetv2CL(num_classes=7, input_size=96)
+elif opt.model == 'mobileDensev1_CL':
+    net = mobileDensenetCL(num_classes=7)
+
+path = os.path.join(opt.dataset + '_' + opt.model)
+#checkpoint = torch.load(os.path.join('FER2013_mobileNet_V1/model_acc88.30', 'PrivateTest_model.t7'))
+
+checkpoint = torch.load(file_str)
+#checkpoint = torch.load(os.path.join(path, opt.split + '_model.t7'))
+
+net.load_state_dict(checkpoint['net'])
+
+net = nn.DataParallel(net,  device_ids=[1,2]).cuda(1)
+
+net.eval()
+
 
 def preprocess_image(cv2im, resize_im=True):
     """
@@ -131,24 +244,16 @@ class FeatureVisualization():
         cv2.imwrite('./img.jpg', feature)
 
 
-cut_size = 90
-# Data
-transform_test = transforms.Compose([
-    transforms.CenterCrop(cut_size),
-    transforms.ToTensor(),
-])
-
 def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
 
-if __name__ == '__main__':
-    net = mobilenet(num_classes=7)
-    CheckPoint = torch.load(os.path.join('FER2013_mobileNet_V1/model_acc88.30', 'PublicTest_model.t7'))
-
-    #CheckPoint = torch.load(os.path.join('FER2013_mobileNet_V1/model_acc88.30', 'PrivateTest_model.t7'), map_location='cpu')
-    net.load_state_dict(CheckPoint['net'])
-    net.cuda()
-    net.eval()
+def singleImageResult():
+    cut_size = 90
+    # Data
+    transform_test = transforms.Compose([
+        transforms.CenterCrop(cut_size),
+        transforms.ToTensor(),
+    ])
     raw_img = io.imread('images/2.jpg')
     gray = rgb2gray(raw_img)
     gray = resize(gray, (96, 96), mode='symmetric').astype(np.uint8)
@@ -168,6 +273,40 @@ if __name__ == '__main__':
 
     score = F.softmax(outputs)
     print(outputs)
+
+def tSNE_Visualization():
+    plt.figure(figsize=(7,6))
+    colors = 'r', 'g', 'b', 'c', 'm', 'y', 'k', 'w', 'orange', 'purple'
+
+    correct = 0
+    total = 0
+    ip_loader = []
+    idx_loader = []
+    for batch_idx, (inputs, targets) in enumerate(Testloader):
+        bs, ncrops, c, h, w = np.shape(inputs)
+        inputs = inputs.view(-1, c, h, w)
+        inputs, targets = inputs.cuda(1), targets.cuda(1)
+        inputs, targets = Variable(inputs, volatile=True), Variable(targets)
+        ip1, outputs = net(inputs)
+
+        outputs_avg = outputs.view(bs, ncrops, -1).mean(1)  # avg over crops
+        ip1_avg = ip1.view(bs, ncrops, -1).mean(1)
+        cp1 = ip1_avg.cpu().detach().numpy()
+        ip_loader.append(cp1.reshape(-1))
+        idx_loader.append(targets.cpu().detach().numpy().reshape(-1)[0])
+
+    ip1_2d = tsne.fit_transform(ip_loader)
+    label_array = range(len(class_names))
+
+    for i, c, label in zip(label_array, colors, class_names):
+        index_arr = [x for x, val in enumerate(idx_loader) if val == i]
+        plt.scatter(ip1_2d[index_arr, 0], ip1_2d[index_arr, 1], c=c, label=label)
+    plt.legend()
+    plt.show()
+    plt.savefig(os.path.join('images/classify_visual/FER2013.png'))
+
+if __name__ == '__main__':
+    tSNE_Visualization()
     #feature_obj = FeatureVisualization(inputs, range(16, 18), net)
     #feature_obj.save_feature_to_img()
     #

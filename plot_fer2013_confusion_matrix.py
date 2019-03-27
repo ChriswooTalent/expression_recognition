@@ -23,14 +23,16 @@ from mobileResNet_CenterLoss import mobileResnetCL
 from mobilenetv2 import mobilenetv2
 from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
+from mobileDenseNet_CenterLoss import mobileDensenetCL
 from models import *
 from CenterLoss import CenterLoss
 
 modelfile_dict = {'mobileResNet_v1': 'FER2013_mobileResNet_v1', 'mobileNet_V1': 'FER2013_mobileNet_V1',
                   'mobileNet_05': 'FER2013_mobilenet_05', 'mobileNet_v2': 'FER2013_mobileNet_v2',
-                  'centerloss':'FER2013_centerloss', 'mobilev1_CL':'FER2013_mobilev1_CL'}
+                  'centerloss':'FER2013_centerloss', 'mobilev1_CL':'FER2013_mobilev1_CL',
+                  'mobileDensev1_CL': 'FER2013_mobileDensev1_CL'}
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobilev1_CL', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobileDensev1_CL', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--split', type=str, default='PrivateTest', help='split')
 opt = parser.parse_args()
@@ -41,6 +43,7 @@ opt = parser.parse_args()
 # te_length = 9374
 # re_length = 96
 
+# confusion_matrix_file = '_mobile_augmixed.png'
 # data_file = './data/data_Augmixed_split.h5'
 # t_length = 99541
 # v_length = 9366
@@ -53,11 +56,12 @@ opt = parser.parse_args()
 # te_length = 9369
 # re_length = 96
 
-# data_file = './data/data_ExpW_split.h5'
-# t_length = 88870
-# v_length = 11110
-# te_length = 11120
-# re_length = 100
+confusion_matrix_file = '_mobile_wild_expw.png'
+data_file = './data/data_ExpW_split.h5'
+t_length = 88870
+v_length = 11110
+te_length = 11120
+re_length = 100
 
 # confusion_matrix_file = '_mobile_FER2013.png'
 # data_file = os.path.join('data/split_dataset', 'FER2013_split.h5')
@@ -66,12 +70,12 @@ opt = parser.parse_args()
 # te_length = 3584
 # re_length = 100
 
-confusion_matrix_file = '_mobile_EXPW.png'
-data_file = os.path.join('data/split_dataset', 'ExpW.h5')
-t_length = 42659
-v_length = 5333
-te_length = 5335
-re_length = 100
+# confusion_matrix_file = '_mobile_EXPW.png'
+# data_file = os.path.join('data/split_dataset', 'ExpW.h5')
+# t_length = 42659
+# v_length = 5333
+# te_length = 5335
+# re_length = 100
 
 # confusion_matrix_file = '_mobile_CL.png'
 # data_file = './data/data_wild.h5'
@@ -148,6 +152,7 @@ def plot_confusion_matrix(cm, classes,
 
 class_names = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
+# Model
 if opt.model == 'VGG19':
     net = VGG('VGG19')
 elif opt.model  == 'Resnet18':
@@ -166,6 +171,12 @@ elif opt.model == 'centerloss':
 elif opt.model == 'mobilev1_CL':
     net = mobilenetv1CL(num_classes=7)
     pretrained_net = mobilenet(num_classes=7)
+elif opt.model == 'mobilenetv2_CL':
+    net = mobilenetv2CL(num_classes=7, input_size=96)
+    pretrained_net = mobilenetv2(num_classes=1000, input_size=96)
+elif opt.model == 'mobileDensev1_CL':
+    net = mobileDensenetCL(num_classes=7)
+    pretrained_net = mobilenetv1CL(num_classes=7)
 
 path = os.path.join(opt.dataset + '_' + opt.model)
 #checkpoint = torch.load(os.path.join('FER2013_mobileNet_V1/model_acc88.30', 'PrivateTest_model.t7'))

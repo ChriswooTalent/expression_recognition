@@ -7,6 +7,7 @@ from torchvision import datasets, transforms
 from  torch.utils.data import DataLoader
 import torch.optim.lr_scheduler as lr_scheduler
 from CenterLoss import CenterLoss
+from IsLandLoss import IsLandLoss
 import matplotlib.pyplot as plt
 
 os.environ["CUDA_VISIVLE_DEVICES"] = '1'
@@ -68,7 +69,10 @@ model = Net().cuda()
 nllloss = nn.NLLLoss().cuda() #CrossEntropyLoss = log_softmax + NLLLoss
 # CenterLoss
 loss_weight = 1
-centerloss = CenterLoss(10, 2).cuda()
+y_total_label = torch.Tensor(range(10)).to(device)
+tlambda = torch.FloatTensor([0.25]).cuda()
+# centerloss = CenterLoss(10, 2).cuda()
+centerloss = IsLandLoss(10, 2, y_total_label, tlambda).cuda()
 
 # optimzer4nn
 optimizer4nn = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
@@ -86,8 +90,8 @@ def visualize(feat, labels, epoch):
     for i in range(10):
         plt.plot(feat[labels == i, 0], feat[labels == i, 1], '.', c=c[i])
     plt.legend(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], loc = 'upper right')
-    plt.xlim(xmin=-800, xmax=800)
-    plt.ylim(ymin=-800, ymax=800)
+    plt.xlim(xmin=-8, xmax=8)
+    plt.ylim(ymin=-8, ymax=8)
     plt.text(-7.8,7.3,"epoch=%d" % epoch)
     plt.savefig('./images/epoch=%d.jpg' % epoch)
     plt.draw()
@@ -102,17 +106,19 @@ def train(epoch):
         data, target = data.cuda(), target.cuda()
 
         ip1, pred = model(data)
-        # loss = nllloss(pred, target) + loss_weight * centerloss(target, ip1)
+        loss = nllloss(pred, target) + loss_weight * centerloss(target, ip1)
 
-        loss = nllloss(pred, target)
+        # loss = nllloss(pred, target) + loss_weight * IsLandLoss(target, ip1)
+
+        #loss = nllloss(pred, target)
 
         optimizer4nn.zero_grad()
-        # optimzer4center.zero_grad()
+        optimzer4center.zero_grad()
 
         loss.backward()
 
         optimizer4nn.step()
-        # optimzer4center.step()
+        optimzer4center.step()
 
         ip1_loader.append(ip1)
         idx_loader.append((target))

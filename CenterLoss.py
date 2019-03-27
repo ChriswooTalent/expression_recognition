@@ -5,7 +5,7 @@ from torch.autograd.function import Function
 class CenterLoss(nn.Module):
     def __init__(self, num_classes, feat_dim, size_average=True):
         super(CenterLoss, self).__init__()
-        self.centers = nn.Parameter(torch.randn(num_classes, feat_dim))
+        self.centers = nn.Parameter(torch.randn(num_classes, feat_dim), requires_grad=True)
         self.centerlossfunc = CenterlossFunc.apply
         self.feat_dim = feat_dim
         self.size_average = size_average

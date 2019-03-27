@@ -18,8 +18,11 @@ import utils
 from mobilenetv1_centerloss import mobilenetv1CL
 from mobileResNet_CenterLoss import mobileResnetCL
 from mobilenetv2 import mobilenetv2
+from mobilenetv2_CenterLoss import mobilenetv2CL
 from mobilenet_v1 import mobilenet, MobileNet, mobilenet_05
 from mobileResNet_v1 import  mobileResnet, MobileResNet
+from mobileDenseNet_CenterLoss import mobileDensenetCL
+from mobileDenseNetV2_CenterLoss import mobileDensenetv2CL
 from focalloss import FocalLoss
 from torch.autograd import Variable
 from models import *
@@ -57,12 +60,12 @@ validation_acc = []
 test_acc = []
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobilev1_CL', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobileDensev2_CL', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
-parser.add_argument('--bs', default=64, type=int, help='learning rate')
-parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
-parser.add_argument('--resume', '-r', action='store_true', default=True, help='resume from checkpoint')
-parser.add_argument('--weight_init', '-i', default=False, help='init from checkpoint')
+parser.add_argument('--bs', default=32, type=int, help='learning rate')
+parser.add_argument('--lr', default=0.0001, type=float, help='learning rate')
+parser.add_argument('--resume', '-r', action='store_true', default=False, help='resume from checkpoint')
+parser.add_argument('--weight_init', '-i', default=True, help='init from checkpoint')
 parser.add_argument('--warmup', default=0, type=int)
 parser.add_argument('--milestones', default='25,35,45,150,220', type=str)
 opt = parser.parse_args()
@@ -74,15 +77,16 @@ best_PrivateTest_acc = 0  # best PrivateTest accuracy
 best_PrivateTest_acc_epoch = 0
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
-learning_rate_decay_start = 45  # 50
+learning_rate_decay_start = 20  # 50
 learning_rate_decay_every = 5 # 5
 learning_rate_decay_rate = 0.9 # 0.9
 
 cut_size = 96
-total_epoch = 100
+total_epoch = 200
 
 
 weight_init_path = os.path.join('FER2013_mobilev1_CL')
+assert os.path.isdir(weight_init_path), 'Error: no checkpoint directory found!'
 path = os.path.join(opt.dataset + '_' + opt.model)
 
 # Data
@@ -110,6 +114,7 @@ PublicTestloader = torch.utils.data.DataLoader(PublicTestset, batch_size=16, shu
 PrivateTestset = FER2013(split = 'PrivateTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
 PrivateTestloader = torch.utils.data.DataLoader(PrivateTestset, batch_size=16, shuffle=False)
 
+cl_featurenum = 1920
 # Model
 if opt.model == 'VGG19':
     net = VGG('VGG19')
@@ -128,7 +133,20 @@ elif opt.model == 'centerloss':
     pretrained_net = mobileResnet(num_classes=7)
 elif opt.model == 'mobilev1_CL':
     net = mobilenetv1CL(num_classes=7)
+    cl_featurenum = 1024
     pretrained_net = mobilenet(num_classes=7)
+elif opt.model == 'mobilenetv2_CL':
+    net = mobilenetv2CL(num_classes=7, input_size=96)
+    pretrained_net = mobilenetv2(num_classes=1000, input_size=96)
+    cl_featurenum = 1280
+elif opt.model == 'mobileDensev1_CL':
+    net = mobileDensenetCL(num_classes=7)
+    pretrained_net = mobilenetv1CL(num_classes=7)
+    cl_featurenum = 512
+elif opt.model == 'mobileDensev2_CL':
+    net = mobileDensenetv2CL(num_classes=7)
+    pretrained_net = mobilenetv1CL(num_classes=7)
+    cl_featurenum = 1920
 
 model_dict = net.state_dict()
 
@@ -162,7 +180,23 @@ if opt.weight_init:
     pretrained_dict = {k:v for k, v in pretrained_dict.items() if k in model_dict}
 
     model_dict.update(pretrained_dict)
+
+    for key in model_dict:
+        if 'num_batches_tracked' in key:
+            continue
+        if 'merge' in key:
+            model_dict[key].requires_grad = True
+            continue
+        if 'ip' in key:
+            model_dict[key].requires_grad = True
+            continue
+        if 'Dense' in key:
+            model_dict[key].requires_grad = True
+            continue
+        model_dict[key].requires_grad = False
+
     net.load_state_dict(model_dict)
+    print('finished!')
 
 else:
     print('==> Building model..')
@@ -174,14 +208,14 @@ if use_cuda:
 criterion = nn.CrossEntropyLoss()
 #criterion = FocalLoss()
 #optimizer = optim.SGD(net.parameters(), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
-optimizer = optim.SGD(net.parameters(), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(filter(lambda p: p.requires_grad, net.parameters()), lr=opt.lr, momentum=0.9, weight_decay=5e-4)
 
 
 # NLLLoss
 nllloss = nn.NLLLoss().cuda() #CrossEntropyLoss = log_softmax + NLLLoss
 # CenterLoss
 loss_weight = 1.0
-centerloss = CenterLoss(7, 1024).cuda()
+centerloss = CenterLoss(7, cl_featurenum).cuda()
 
 # optimzer4center
 optimzer4center = optim.SGD(centerloss.parameters(), lr=0.05)

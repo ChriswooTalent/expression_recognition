@@ -14,14 +14,23 @@ import os
 import argparse
 import utils
 from CK import CK
+from fer import FER2013
 from torch.autograd import Variable
 from models import *
+from mobilenet_v1 import mobilenet
+from mobilenetv2 import mobilenetv2
+
+data_file = os.path.join('data/split_dataset', 'CK+_split.h5')
+t_length = 1433
+v_length = 179
+te_length = 182
+re_length = 100
 
 parser = argparse.ArgumentParser(description='PyTorch CK+ CNN Training')
-parser.add_argument('--model', type=str, default='VGG19', help='CNN architecture')
+parser.add_argument('--model', type=str, default='mobileNet_V1', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='CK+', help='dataset')
 parser.add_argument('--fold', default=1, type=int, help='k fold number')
-parser.add_argument('--bs', default=128, type=int, help='batch_size')
+parser.add_argument('--bs', default=32, type=int, help='batch_size')
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
 opt = parser.parse_args()
@@ -32,12 +41,12 @@ best_Test_acc = 0  # best PrivateTest accuracy
 best_Test_acc_epoch = 0
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
-learning_rate_decay_start = 20  # 50
-learning_rate_decay_every = 1 # 5
-learning_rate_decay_rate = 0.8 # 0.9
+learning_rate_decay_start = 60  # 50
+learning_rate_decay_every = 10 # 5
+learning_rate_decay_rate = 0.9 # 0.9
 
 cut_size = 44
-total_epoch = 60
+total_epoch = 150
 
 path = os.path.join(opt.dataset + '_' + opt.model, str(opt.fold))
 
@@ -59,11 +68,22 @@ trainloader = torch.utils.data.DataLoader(trainset, batch_size=opt.bs, shuffle=T
 testset = CK(split = 'Testing', fold = opt.fold, transform=transform_test)
 testloader = torch.utils.data.DataLoader(testset, batch_size=5, shuffle=False, num_workers=1)
 
+# trainset = FER2013(split = 'Training', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_train)
+# trainloader = torch.utils.data.DataLoader(trainset, batch_size=opt.bs, shuffle=True)
+# # testset = FER2013(split = 'PublicTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
+# # testloader = torch.utils.data.DataLoader(testset, batch_size=int(opt.bs/2), shuffle=False)
+# testset = FER2013(split = 'PrivateTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
+# testloader = torch.utils.data.DataLoader(testset, batch_size=int(opt.bs/16), shuffle=False)
+
 # Model
 if opt.model == 'VGG19':
     net = VGG('VGG19')
 elif opt.model == 'Resnet18':
     net = ResNet18()
+elif opt.model == 'mobileNet_V1':
+    net = mobilenet(num_classes=7)
+elif opt.model == 'mobilenetv2':
+    net = mobilenetv2(num_classes=7, input_size=48)
 
 if opt.resume:
     # Load checkpoint.
@@ -114,7 +134,7 @@ def train(epoch):
         utils.clip_gradient(optimizer, 0.1)
         optimizer.step()
 
-        train_loss += loss.data[0]
+        train_loss += loss.item()
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
@@ -143,7 +163,7 @@ def test(epoch):
         outputs_avg = outputs.view(bs, ncrops, -1).mean(1)  # avg over crops
 
         loss = criterion(outputs_avg, targets)
-        PrivateTest_loss += loss.data[0]
+        PrivateTest_loss += loss.item()
         _, predicted = torch.max(outputs_avg.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()

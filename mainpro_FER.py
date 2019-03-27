@@ -28,17 +28,17 @@ from models import *
 # te_length = 9369
 # re_length = 96
 
-data_file = './data/data_pretrain.h5'
-t_length = 99540
-v_length = 9366
-te_length = 9369
-re_length = 100
-
-# data_file = './data/data_wild.h5'
-# t_length = 144747
-# v_length = 15017
-# te_length = 15023
+# data_file = './data/data_pretrain.h5'
+# t_length = 99540
+# v_length = 9366
+# te_length = 9369
 # re_length = 100
+
+data_file = './data/data_wild.h5'
+t_length = 144747
+v_length = 15017
+te_length = 15023
+re_length = 100
 #
 # t_length = 28709
 # v_length = 3589
@@ -54,11 +54,11 @@ validation_acc = []
 test_acc = []
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
-parser.add_argument('--model', type=str, default='mobilenetv2', help='CNN architecture')
+parser.add_argument('--model', type=str, default='Resnet18', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--bs', default=64, type=int, help='learning rate')
-parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
-parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
+parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
+parser.add_argument('--resume', '-r', action='store_true', default=False, help='resume from checkpoint')
 parser.add_argument('--warmup', default=5, type=int)
 parser.add_argument('--milestones', default='25,35,45,150,220', type=str)
 opt = parser.parse_args()
@@ -70,9 +70,9 @@ best_PrivateTest_acc = 0  # best PrivateTest accuracy
 best_PrivateTest_acc_epoch = 0
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
-learning_rate_decay_start = 30  # 50
+learning_rate_decay_start = 50  # 50
 learning_rate_decay_every = 5 # 5
-learning_rate_decay_rate = 0.95 # 0.9
+learning_rate_decay_rate = 0.9 # 0.9
 
 cut_size = 96
 total_epoch = 100
@@ -132,11 +132,6 @@ if opt.resume:
     start_epoch = checkpoint['best_PrivateTest_acc_epoch'] + 1
 else:
     print('==> Building model..')
-
-# if torch.cuda.device_count() > 1:
-#     print("Let's use", torch.cuda.device_count(), "GPUs!")
-#     # torch.cuda.set_device([0,1,2,3])
-#     net = nn.DataParallel(net,device_ids=[0,1,2,3])
 
 
 if use_cuda:
