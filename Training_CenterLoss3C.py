@@ -29,37 +29,11 @@ from torch.autograd import Variable
 from models import *
 from CenterLoss import CenterLoss
 
-# data_file = './data/data_mixed.h5'
-# t_length = 74925
-# v_length = 9366
-# te_length = 9369
-# re_length = 96
-
-# data_file = './data/data_pretrain.h5'
-# t_length = 99540
-# v_length = 9366
-# te_length = 9369
-# re_length = 100
-
-data_file = './data/data_wild.h5'
+data_file = './data/data_wild_3C.h5'
 t_length = 144747
 v_length = 15017
 te_length = 15023
-re_length = 100
-
-#
-# t_length = 28709
-# v_length = 3589
-# te_length = 3589
-# re_length = 48
-
-training_loss = []
-validation_loss = []
-test_loss = []
-
-training_acc = []
-validation_acc = []
-test_acc = []
+re_length = 70
 
 parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
 parser.add_argument('--model', type=str, default='mobileDensev2_CL', help='CNN architecture')
@@ -109,11 +83,11 @@ transform_test = transforms.Compose([
 #      transforms.ToTensor(),
 #  ])
 
-trainset = FER2013(split = 'Training', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_train)
+trainset = Mixed(split = 'Training', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_train)
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=opt.bs, shuffle=True)
-PublicTestset = FER2013(split = 'PublicTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
+PublicTestset = Mixed(split = 'PublicTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
 PublicTestloader = torch.utils.data.DataLoader(PublicTestset, batch_size=16, shuffle=False)
-PrivateTestset = FER2013(split = 'PrivateTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
+PrivateTestset = Mixed(split = 'PrivateTest', filename=data_file, train_length=t_length, validate_length=v_length, test_length=te_length, resize_length=re_length, transform=transform_test)
 PrivateTestloader = torch.utils.data.DataLoader(PrivateTestset, batch_size=16, shuffle=False)
 
 cl_featurenum = 1920
