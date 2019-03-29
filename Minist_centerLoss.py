@@ -50,11 +50,11 @@ torch.cuda.set_device(1)
 use_cuda = torch.cuda.is_available() and True
 device = torch.device("cuda" if use_cuda else "cpu")
 # Dataset
-trainset = datasets.MNIST('../MNIST', download=True, train=True, transform=transforms.Compose([
+trainset = datasets.MNIST('../MNIST', download=False, train=True, transform=transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.1307,), (0.3081,))]))
 
-trainset1 = datasets.MNIST('../MNIST', download=True, train=True, transform = None)
+trainset1 = datasets.MNIST('../MNIST', download=False, train=True, transform = None)
 
 
 # trainset1 = datasets.MNIST('../MNIST', download=True, train=True, transform=transforms.Compose([
@@ -68,18 +68,18 @@ model = Net().cuda()
 # NLLLoss
 nllloss = nn.NLLLoss().cuda() #CrossEntropyLoss = log_softmax + NLLLoss
 # CenterLoss
-loss_weight = 1
+loss_weight = 1.0
 y_total_label = torch.Tensor(range(10)).to(device)
-tlambda = torch.FloatTensor([0.25]).cuda()
-# centerloss = CenterLoss(10, 2).cuda()
-centerloss = IsLandLoss(10, 2, y_total_label, tlambda).cuda()
+tlambda = torch.FloatTensor([0.001]).cuda(1)
+#centerloss = CenterLoss(10, 2).cuda(1)
+centerloss = IsLandLoss(10, 2, y_total_label, tlambda).cuda(1)
 
 # optimzer4nn
 optimizer4nn = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
 sheduler = lr_scheduler.StepLR(optimizer4nn, 20, gamma=0.8)
 
 # optimzer4center
-optimzer4center = optim.SGD(centerloss.parameters(), lr=0.5)
+optimzer4center = optim.SGD(centerloss.parameters(), lr=1.0)
 
 
 def visualize(feat, labels, epoch):
@@ -103,7 +103,8 @@ def train(epoch):
     ip1_loader = []
     idx_loader = []
     for i, (data, target) in enumerate(train_loader):
-        data, target = data.cuda(), target.cuda()
+        print(i)
+        data, target = data.cuda(1), target.cuda(1)
 
         ip1, pred = model(data)
         loss = nllloss(pred, target) + loss_weight * centerloss(target, ip1)

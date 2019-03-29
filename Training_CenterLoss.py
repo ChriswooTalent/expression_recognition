@@ -14,7 +14,6 @@ import numpy as np
 import os
 import argparse
 from fer import FER2013
-from mixed import Mixed
 import utils
 from mobilenetv1_centerloss import mobilenetv1CL
 from mobileResNet_CenterLoss import mobileResnetCL
@@ -28,6 +27,7 @@ from focalloss import FocalLoss
 from torch.autograd import Variable
 from models import *
 from CenterLoss import CenterLoss
+from IsLandLoss import IsLandLoss
 
 # data_file = './data/data_mixed.h5'
 # t_length = 74925
@@ -46,7 +46,6 @@ t_length = 144747
 v_length = 15017
 te_length = 15023
 re_length = 100
-
 #
 # t_length = 28709
 # v_length = 3589
@@ -65,9 +64,9 @@ parser = argparse.ArgumentParser(description='PyTorch Fer2013 CNN Training')
 parser.add_argument('--model', type=str, default='mobileDensev2_CL', help='CNN architecture')
 parser.add_argument('--dataset', type=str, default='FER2013', help='CNN architecture')
 parser.add_argument('--bs', default=32, type=int, help='learning rate')
-parser.add_argument('--lr', default=0.0001, type=float, help='learning rate')
+parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
 parser.add_argument('--resume', '-r', action='store_true', default=False, help='resume from checkpoint')
-parser.add_argument('--weight_init', '-i', default=False, help='init from checkpoint')
+parser.add_argument('--weight_init', '-i', default=True, help='init from checkpoint')
 parser.add_argument('--warmup', default=0, type=int)
 parser.add_argument('--milestones', default='25,35,45,150,220', type=str)
 opt = parser.parse_args()
@@ -79,11 +78,12 @@ best_PrivateTest_acc = 0  # best PrivateTest accuracy
 best_PrivateTest_acc_epoch = 0
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
-learning_rate_decay_start = 20  # 50
-learning_rate_decay_every = 5 # 5
+lr1 = 1.0
+learning_rate_decay_start = 10  # 50
+learning_rate_decay_every = 2 # 5
 learning_rate_decay_rate = 0.9 # 0.9
 
-cut_size = 64
+cut_size = 96
 total_epoch = 200
 
 
@@ -183,29 +183,37 @@ if opt.weight_init:
 
     model_dict.update(pretrained_dict)
 
-    for key in model_dict:
-        if 'num_batches_tracked' in key:
-            continue
-        if 'merge' in key:
-            model_dict[key].requires_grad = True
-            continue
-        if 'ip' in key:
-            model_dict[key].requires_grad = True
-            continue
-        if 'Dense' in key:
-            model_dict[key].requires_grad = True
-            continue
-        model_dict[key].requires_grad = False
-
     net.load_state_dict(model_dict)
+
+    for name, param in net.named_parameters():
+        if 'merge' in name:
+            param.requires_grad = True
+            continue
+        if 'ip' in name:
+            param.requires_grad = True
+            continue
+        if 'Dense' in name:
+            param.requires_grad = True
+            continue
+        if 'dw5_4' in name:
+            param.requires_grad = True
+            continue
+        if 'dw5_5' in name:
+            param.requires_grad = True
+            continue
+        if 'dw6' in name:
+            param.requires_grad = True
+            continue
+        param.requires_grad = False
+
     print('finished!')
 
 else:
     print('==> Building model..')
 
-torch.cuda.set_device(0)
+torch.cuda.set_device(3)
 if use_cuda:
-    net = net.cuda(0)
+    net = net.cuda(3)
 
 criterion = nn.CrossEntropyLoss()
 #criterion = FocalLoss()
@@ -217,10 +225,14 @@ optimizer = optim.SGD(filter(lambda p: p.requires_grad, net.parameters()), lr=op
 nllloss = nn.NLLLoss().cuda() #CrossEntropyLoss = log_softmax + NLLLoss
 # CenterLoss
 loss_weight = 1.0
-centerloss = CenterLoss(7, cl_featurenum).cuda()
+# centerloss = CenterLoss(7, cl_featurenum).cuda()
+device = torch.device("cuda" if use_cuda else "cpu")
+y_total_label = torch.Tensor(range(7)).to(device)
+tlambda = torch.FloatTensor([0.001]).cuda()
+centerloss = IsLandLoss(10, cl_featurenum, y_total_label, tlambda).cuda()
 
 # optimzer4center
-optimzer4center = optim.SGD(centerloss.parameters(), lr=0.05)
+optimzer4center = optim.SGD(centerloss.parameters(), lr=lr1)
 
 def write_result_to_file(result_list, filename):
     result_file = open(filename, "w")
@@ -320,20 +332,27 @@ def train_warmup(epoch):
 def train(epoch):
     print('\nEpoch: %d' % epoch)
     global Train_acc
+    global lr1
     net.train()
     train_loss = 0
     f_loss = 0.0
     correct = 0
     total = 0
+    current_lr1 = 0.0
 
     if epoch > learning_rate_decay_start and learning_rate_decay_start >= 0:
         frac = (epoch - learning_rate_decay_start) // learning_rate_decay_every
         decay_factor = learning_rate_decay_rate ** frac
+        decay_factor1 = 0.95 ** frac
         current_lr = opt.lr * decay_factor
+        current_lr1 = lr1 * decay_factor1
         utils.set_lr(optimizer, current_lr)  # set the decayed rate
+        utils.set_lr(optimzer4center, current_lr1)
     else:
         current_lr = opt.lr
+        current_lr1 = lr1
     print('learning_rate: %s' % str(current_lr))
+    print('learning_rate1: %s' % str(current_lr1))
 
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         if use_cuda:
